@@ -18,11 +18,19 @@ from pathlib import Path
 
 from viz2psy.models.resmem import ResMemModel
 from viz2psy.models.emonet import EmoNetModel
+from viz2psy.models.clip import CLIPModel
+from viz2psy.models.gist import GISTModel
+from viz2psy.models.llstat import LLStatModel
+from viz2psy.models.saliency import SaliencyModel
 from viz2psy.pipeline import score_images
 
 MODELS = {
     "resmem": ResMemModel,
     "emonet": EmoNetModel,
+    "clip": CLIPModel,
+    "gist": GISTModel,
+    "llstat": LLStatModel,
+    "saliency": SaliencyModel,
 }
 
 

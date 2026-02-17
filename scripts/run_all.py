@@ -6,6 +6,10 @@ from pathlib import Path
 
 from viz2psy.models.resmem import ResMemModel
 from viz2psy.models.emonet import EmoNetModel
+from viz2psy.models.clip import CLIPModel
+from viz2psy.models.gist import GISTModel
+from viz2psy.models.llstat import LLStatModel
+from viz2psy.models.saliency import SaliencyModel
 from viz2psy.pipeline import run_model, DEFAULT_IMAGE_DIR, DEFAULT_STIM_INFO, DEFAULT_OUTPUT_DIR
 
 
@@ -20,6 +24,10 @@ def main():
     models = [
         ResMemModel(),
         EmoNetModel(),
+        CLIPModel(),
+        GISTModel(),
+        LLStatModel(),
+        SaliencyModel(),
     ]
 
     for model in models:

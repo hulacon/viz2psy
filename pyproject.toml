@@ -14,6 +14,9 @@ dependencies = [
     "pandas>=1.5",
     "tqdm>=4.60",
     "resmem>=1.1",
+    "open-clip-torch>=2.24",
+    "scikit-image>=0.21",
+    "deepgaze-pytorch>=1.0",
 ]
 
 [project.optional-dependencies]

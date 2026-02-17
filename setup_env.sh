@@ -17,7 +17,7 @@ echo "Installing PyTorch with CUDA 12.4 support ..."
 conda install pytorch torchvision pytorch-cuda=12.4 -c pytorch -c nvidia -y
 
 echo "Installing Python dependencies ..."
-pip install resmem tqdm pandas Pillow
+pip install resmem tqdm pandas Pillow open-clip-torch scikit-image deepgaze-pytorch
 
 echo "Installing viz2psy in editable mode ..."
 pip install -e /gpfs/projects/hulacon/bhutch/viz2psy
