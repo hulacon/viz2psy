@@ -7,3 +7,6 @@ build/
 *.pt
 *.pth
 .claude/
+
+# Local test data
+data/

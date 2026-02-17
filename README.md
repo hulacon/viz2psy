@@ -4,11 +4,10 @@ Extract psychological and perceptual features from images using multiple computa
 
 ## Features
 
-- **10 pre-integrated models** covering memorability, emotion, semantics, low-level statistics, and more
-- **Unified CLI** for images, videos, and HDF5 image bricks (e.g., NSD dataset)
-- **Consistent interface** across all models with batch processing support
-- **Metadata sidecar files** documenting inputs, outputs, runtimes, and feature definitions
-- **GPU acceleration** with automatic device detection (CUDA, MPS)
+- **10 pre-integrated models** covering memorability, emotion, semantics, saliency, and more
+- **Unified CLI** for images, videos, and HDF5 image bricks
+- **Interactive visualizations** with Plotly-based dashboards
+- **Metadata sidecar files** documenting outputs and feature definitions
 
 ## Installation
 
@@ -16,7 +15,7 @@ Extract psychological and perceptual features from images using multiple computa
 pip install viz2psy
 ```
 
-Or install from source:
+Or from source:
 
 ```bash
 git clone https://github.com/bhutch/viz2psy.git
@@ -26,112 +25,60 @@ pip install -e .
 
 ## Quick Start
 
-### Command Line
-
 ```bash
-# List available models
-viz2psy --list-models
+# Score images with multiple models
+viz2psy resmem clip emonet images/*.jpg -o scores.csv
 
-# Score a single image
-viz2psy resmem photo.jpg
-
-# Score multiple images and save to CSV
-viz2psy clip images/*.png -o embeddings.csv
-
-# Run multiple models at once
-viz2psy resmem clip emonet images/*.png -o scores.csv
-
-# Run all models
-viz2psy --all images/*.png -o all_scores.csv
-
-# Use CPU explicitly
-viz2psy emonet images/*.jpg --device cpu --quiet
-
-# Score video frames (default: every 0.5s)
-viz2psy resmem movie.mp4 -o scores.csv
-
-# Custom frame interval (1 second)
+# Score video frames
 viz2psy resmem movie.mp4 --frame-interval 1.0 -o scores.csv
 
-# Save extracted frames to disk (for large videos)
-viz2psy resmem movie.mp4 --save-frames ./frames -o scores.csv
-
-# Score HDF5 image brick (e.g., NSD dataset)
-viz2psy resmem data.hdf5 -o scores.csv
-
-# HDF5 with slice selection
-viz2psy resmem data.hdf5 --dataset imgBrick --start 0 --end 1000 -o scores.csv
-
-# List datasets in HDF5 file
-viz2psy --list-datasets data.hdf5
+# Visualize results
+viz2psy-viz image scores.csv --browse --image-root ./images -o viewer.html
 ```
-
-When saving to a file (`-o`), a metadata sidecar (`.meta.json`) is automatically created with input/output info, runtimes, and feature definitions.
-
-### Python API
 
 ```python
 from viz2psy.models.resmem import ResMemModel
 from viz2psy.pipeline import score_images
 
-# Initialize and score images
 model = ResMemModel()
 df = score_images(model, ["photo1.jpg", "photo2.jpg"])
-print(df)
 ```
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [CLI](docs/cli.md) | `viz2psy` command line reference |
+| [Models](docs/models.md) | Available models, outputs, and references |
+| [Visualization](docs/visualization.md) | `viz2psy-viz` CLI and interactive features |
+| [API](docs/api.md) | Python API reference |
+| [Known Issues](KNOWN_ISSUES.md) | Current limitations |
 
 ## Available Models
 
 | Model | Output | Description |
 |-------|--------|-------------|
-| `resmem` | 1 score | Image memorability (0-1). ResMem, Needell & Bainbridge 2022. |
-| `emonet` | 20 scores | Emotion category probabilities. EmoNet, Kragel et al. 2019. |
-| `clip` | 512 dims | CLIP ViT-B-32 L2-normalized embeddings. |
-| `gist` | 512 dims | Gabor-based spatial envelope descriptor. Oliva & Torralba 2001. |
-| `llstat` | 17 scores | Low-level statistics: luminance, contrast, color, edges, etc. |
-| `saliency` | 576 dims | DeepGaze IIE 24x24 fixation density grid. |
-| `dinov2` | 768 dims | DINOv2 ViT-B/14 self-supervised embeddings. |
-| `aesthetics` | 1 score | LAION Aesthetics V2 quality score (1-10). |
-| `places` | 467 scores | Places365 scene categories + 102 SUN attributes. |
-| `yolo` | 85 scores | YOLOv8 object counts (80 classes) + summary statistics. |
+| `resmem` | 1 score | Image memorability |
+| `emonet` | 20 scores | Emotion probabilities |
+| `clip` | 512 dims | Vision-language embeddings |
+| `dinov2` | 768 dims | Self-supervised features |
+| `gist` | 512 dims | Spatial envelope |
+| `places` | 467 scores | Scene categories + attributes |
+| `llstat` | 17 scores | Low-level statistics |
+| `saliency` | 576 dims | Fixation density grid |
+| `aesthetics` | 1 score | Aesthetic quality |
+| `yolo` | 85 scores | Object detection counts |
 
-## Adding Custom Models
-
-Create a new model by inheriting from `BaseModel`:
-
-```python
-from viz2psy.models.base import BaseModel
-from PIL import Image
-
-class MyModel(BaseModel):
-    name = "mymodel"
-
-    def load(self):
-        # Load your model weights here
-        self.model = ...
-
-    def predict(self, image: Image.Image) -> dict:
-        # Return a dict of feature names -> values
-        return {"score": 0.5}
-```
-
-Then use it with the pipeline:
-
-```python
-from viz2psy.pipeline import score_images
-
-model = MyModel()
-df = score_images(model, image_paths)
-```
+See [docs/models.md](docs/models.md) for detailed documentation.
 
 ## Citation
 
 If you use viz2psy in your research, please cite the relevant model papers:
 
-- **ResMem**: Needell, C. D., & Bainbridge, W. A. (2022). Embracing new techniques in deep learning for estimating image memorability. *Computational Brain & Behavior*.
-- **EmoNet**: Kragel, P. A., et al. (2019). Emotion schemas are embedded in the human visual system. *Science Advances*.
-- **CLIP**: Radford, A., et al. (2021). Learning transferable visual models from natural language supervision. *ICML*.
-- **DINOv2**: Oquab, M., et al. (2023). DINOv2: Learning robust visual features without supervision. *arXiv*.
+- **ResMem**: Needell & Bainbridge (2022). *Computational Brain & Behavior*.
+- **EmoNet**: Kragel et al. (2019). *Science Advances*.
+- **CLIP**: Radford et al. (2021). *ICML*.
+- **DINOv2**: Oquab et al. (2023). *arXiv*.
 
 ## License
 

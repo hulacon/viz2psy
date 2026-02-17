@@ -54,6 +54,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest", "ipython"]
+interactive = ["plotly>=5.18", "kaleido>=0.2"]
 
 [project.scripts]
 viz2psy = "viz2psy.cli:main"
