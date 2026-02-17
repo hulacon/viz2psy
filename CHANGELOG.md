@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Interactive visualizations (Plotly-based)
+  - Single-image viewer with dropdown panel selection
+  - Browsable viewer with slider for multiple images/frames
+  - Panel types: emotions, scalars, saliency, objects, scenes, wordcloud
+  - Linked scatter + timeseries explorer
+- Path resolution system (`UnifiedImageResolver`)
+  - Sidecar-based path inference
+  - Video frame extraction (OpenCV)
+  - HDF5 image extraction (h5py)
+- Documentation restructure
+  - `docs/cli.md` - CLI reference
+  - `docs/models.md` - Model documentation
+  - `docs/visualization.md` - Visualization guide
+  - `docs/api.md` - Python API reference
+- `KNOWN_ISSUES.md` for tracking limitations
+- `CHANGELOG.md` for version history
+- `__version__` attribute in package
+
 ## [0.1.0] - 2024-02-17
 
 ### Added

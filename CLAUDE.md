@@ -121,6 +121,55 @@ pip install -e ".[dev]"
 pytest
 ```
 
+## Commit Conventions
+
+This project uses [Conventional Commits](https://www.conventionalcommits.org/) with [Commitizen](https://commitizen-tools.github.io/commitizen/) for automated changelog generation and version bumping.
+
+### Commit Message Format
+
+```
+<type>(<scope>): <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+### Common Types
+
+| Type | Description |
+|------|-------------|
+| `feat` | New feature |
+| `fix` | Bug fix |
+| `docs` | Documentation only |
+| `style` | Formatting, no code change |
+| `refactor` | Code change that neither fixes nor adds |
+| `perf` | Performance improvement |
+| `test` | Adding or updating tests |
+| `chore` | Build process, dependencies, etc. |
+
+### Using Commitizen
+
+```bash
+# Interactive commit (guides you through the format)
+cz commit
+
+# Check if commits follow convention
+cz check --rev-range HEAD~5..HEAD
+
+# Bump version and update CHANGELOG automatically
+cz bump
+
+# Dry run to see what version bump would do
+cz bump --dry-run
+```
+
+### Version Files
+
+Version is tracked in two places (kept in sync by `cz bump`):
+- `pyproject.toml`: `version = "X.Y.Z"`
+- `src/viz2psy/__init__.py`: `__version__ = "X.Y.Z"`
+
 ## Code Style
 
 - Use type hints for function signatures

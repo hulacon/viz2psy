@@ -53,7 +53,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "ipython"]
+dev = ["pytest", "ipython", "commitizen>=3.12"]
 interactive = ["plotly>=5.18", "kaleido>=0.2"]
 
 [project.scripts]
@@ -67,3 +67,14 @@ Issues = "https://github.com/bhutch/viz2psy/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version = "0.1.0"
+version_files = [
+    "pyproject.toml:version",
+    "src/viz2psy/__init__.py:__version__",
+]
+tag_format = "v$version"
+changelog_file = "CHANGELOG.md"
+update_changelog_on_bump = true
