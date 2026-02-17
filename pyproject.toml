@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=64", "setuptools-scm"]
-build-backend = "setuptools.backends._legacy:_Backend"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "viz2psy"
@@ -17,6 +17,7 @@ dependencies = [
     "open-clip-torch>=2.24",
     "scikit-image>=0.21",
     "deepgaze-pytorch>=1.0",
+    "ultralytics>=8.0",
 ]
 
 [project.optional-dependencies]

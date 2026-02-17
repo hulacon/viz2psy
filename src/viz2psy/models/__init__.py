@@ -1,10 +1,27 @@
-"""Model wrappers for psychological feature extraction."""
+"""Model wrappers for psychological feature extraction.
 
-from .resmem import ResMemModel
-from .emonet import EmoNetModel
-from .clip import CLIPModel
-from .gist import GISTModel
-from .llstat import LLStatModel
-from .saliency import SaliencyModel
+Imports are lazy to avoid hard failures when optional dependencies
+(e.g., resmem, deepgaze-pytorch) are not installed.
+"""
 
-__all__ = ["ResMemModel", "EmoNetModel", "CLIPModel", "GISTModel", "LLStatModel", "SaliencyModel"]
+
+def __getattr__(name):
+    _registry = {
+        "ResMemModel": ".resmem",
+        "EmoNetModel": ".emonet",
+        "CLIPModel": ".clip",
+        "GISTModel": ".gist",
+        "LLStatModel": ".llstat",
+        "SaliencyModel": ".saliency",
+        "DINOv2Model": ".dinov2",
+        "AestheticsModel": ".aesthetics",
+        "PlacesModel": ".places",
+        "YOLOModel": ".yolo",
+    }
+    if name in _registry:
+        import importlib
+        module = importlib.import_module(_registry[name], __package__)
+        return getattr(module, name)
+    if name == "__all__":
+        return list(_registry.keys())
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -1,11 +1,12 @@
-# viz2psych — Visual Image Psychological Feature Extraction
+# viz2psy — Visual Image Psychological Feature Extraction
 
 ## Project Goal
 
-Build a Python pipeline that takes images and produces psychological/perceptual
-feature scores from multiple computational models. The immediate use case is
-scoring 1,000 images from the MMMData neuroimaging study, but the code should
-be model-agnostic and extensible to new models.
+A Python package that takes any image(s) and produces psychological/perceptual
+feature scores from multiple computational models. The package is model-agnostic
+and extensible — each model is a thin wrapper with a consistent interface. The
+primary use case is the MMMData neuroimaging study (1,000 NSD shared images),
+but all models work on arbitrary images via `scripts/score.py`.
 
 ---
 
@@ -35,81 +36,63 @@ filenames is 1-based (i.e., filename nsd ID = CSV nsdId + 1).
 
 ---
 
+## Usage
+
+### Score arbitrary images
+
+```bash
+# Single image
+python scripts/score.py resmem photo.jpg
+
+# Multiple images, save to CSV
+python scripts/score.py clip /path/to/images/*.png -o scores.csv
+```
+
+### Score MMMData shared1000 (via pipeline.run_model)
+
+```bash
+python scripts/run_resmem.py   # outputs resmem_scores.csv
+python scripts/run_all.py      # runs all models
+```
+
 ## Output Requirements
 
+### MMMData shared1000 output
 - One CSV per model, saved in `/projects/hulacon/shared/mmmdata/stimuli/shared1000/`
 - Each CSV keyed by `nsdId` (0-based, consistent with existing metadata CSVs)
   and `cocoId`
 - Include the image filename as a column for easy cross-referencing
-- Naming convention: `{model_name}_scores.csv` (e.g., `resmem_scores.csv`,
-  `emonet_scores.csv`)
+- Naming convention: `{model_name}_scores.csv` (e.g., `resmem_scores.csv`)
+
+### General output (score.py)
+- One CSV with columns: `filename`, `filepath`, and all model score columns
+- Works with any image format PIL can read
 
 ---
 
-## Models to Implement
+## Implemented Models
 
-### 1. ResMem (Image Memorability)
+All models follow the `BaseModel` interface (`load()`, `predict(image)`,
+`predict_batch(images)`) and are registered in `scripts/score.py`.
 
-- **What it predicts**: How memorable an image is to humans (scalar 0–1)
-- **Paper**: Needell & Bainbridge, "Embracing New Techniques in Deep Learning
-  for Estimating Image Memorability" (2022)
-- **Code**: https://github.com/Brain-Bridge-Lab/resmem
-- **Install**: `pip install resmem` (PyPI package)
-- **Architecture**: ResNet-based with regression head
-- **Input**: 227x227 RGB images (built-in `transformer` handles resizing)
-- **Output**: Single float (memorability score, 0–1)
-- **Dependencies**: PyTorch, torchvision, PIL
+| Model | Module | Output columns | Description |
+|-------|--------|---------------|-------------|
+| `resmem` | `models/resmem.py` | `memorability` (1) | Image memorability score (0–1). ResMem, Needell & Bainbridge 2022. |
+| `emonet` | `models/emonet.py` | `Adoration`, `Awe`, `Fear`, etc. (20) | Emotion category probabilities. EmoNet, Kragel et al. 2019. |
+| `clip` | `models/clip.py` | `clip_000`–`clip_511` (512) | CLIP ViT-B-32 L2-normalized embeddings. Semantic image representations. |
+| `gist` | `models/gist.py` | `gist_000`–`gist_511` (512) | Gabor-based spatial envelope descriptor. Oliva & Torralba 2001. |
+| `llstat` | `models/llstat.py` | `luminance_mean`, `rms_contrast`, etc. (17) | Luminance, RGB, LAB, saturation, spectral energy, edge density, colorfulness. |
+| `saliency` | `models/saliency.py` | `saliency_XX_YY` (576) | DeepGaze IIE 24x24 fixation density grid. |
+| `dinov2` | `models/dinov2.py` | `dinov2_000`–`dinov2_767` (768) | DINOv2 ViT-B/14 self-supervised embeddings. Visual structure features. |
+| `aesthetics` | `models/aesthetics.py` | `aesthetic_score` (1) | LAION Aesthetics V2 MLP on CLIP ViT-L/14. Score ~1–10. |
+| `places` | `models/places.py` | `places_*` (365) + `sunattr_*` (102) | Places365 scene categories + 102 SUN scene attributes. |
+| `yolo` | `models/yolo.py` | `yolo_*` (80) + aggregates (5) | YOLOv8 object detection: per-category counts + summary stats. |
 
-**Usage example**:
-```python
-from resmem import ResMem, transformer
-from PIL import Image
+### Future Models
 
-model = ResMem(pretrained=True)
-model.eval()
-
-img = Image.open('path/to/image.png').convert('RGB')
-image_x = transformer(img)
-prediction = model(image_x.view(-1, 3, 227, 227))
-# prediction is a tensor with the memorability score
-```
-
-### 2. EmoNet (Emotion Classification)
-
-- **What it predicts**: Emotion category probabilities from images
-- **Paper**: Kragel et al., "Emotion schemas are embedded in the human visual
-  system" (2019, Science Advances)
-- **Code**: https://github.com/ecco-laboratory/emonet-pytorch
-- **Install**: Clone repo, download weights from OSF via built-in method
-- **Architecture**: Fine-tuned AlexNet (only last FC layer retrained for
-  emotion categories)
-- **Input**: RGB images (AlexNet standard: 227x227 or 224x224 — check repo)
-- **Output**: Probabilities over ~20 emotion categories (from Cowen & Keltner
-  2017 taxonomy — includes amusement, anger, awe, contentment, disgust,
-  excitement, fear, sadness, etc.)
-- **Dependencies**: PyTorch
-
-**Usage example**:
-```python
-import torch
-from models import EmoNet
-
-model = EmoNet()
-model.load_state_dict_from_web()  # downloads weights from OSF
-model.eval()
-# Process image through model...
-```
-
-The repo includes `replicate-kragel2019.py` as a reference for how to process
-images.
-
-### Future Models (not yet, but design for extensibility)
-
-- Additional memorability models (AMNet, MemNet via Caffe-to-PyTorch)
-- Scene recognition (Places365)
-- Aesthetic quality prediction
-- Visual complexity metrics
-- Low-level features (spatial frequency, color statistics, edge density)
+- **SAM** — Segment Anything for visual complexity (segment counts, size distribution)
+- **RetinaFace** — Face detection (count, area, centrality) via insightface
+- **ViTPose** — Pose estimation (person count, body area, pose features) via HuggingFace
 
 ---
 
@@ -152,26 +135,34 @@ PyTorch before creating a new env.
 
 ## Design Notes
 
-### Recommended Architecture
+### Architecture
 
 ```
-viz2psych/
+viz2psy/
 ├── CLAUDE.md              # This file
 ├── pyproject.toml         # Package metadata + dependencies
 ├── src/
-│   └── viz2psych/
+│   └── viz2psy/
 │       ├── __init__.py
 │       ├── models/        # One module per model
 │       │   ├── __init__.py
-│       │   ├── base.py    # Abstract base class for all models
-│       │   ├── resmem.py  # ResMem wrapper
-│       │   └── emonet.py  # EmoNet wrapper
+│       │   ├── base.py    # Abstract base class (load/predict/predict_batch)
+│       │   ├── resmem.py
+│       │   ├── emonet.py
+│       │   ├── clip.py
+│       │   ├── gist.py
+│       │   ├── llstat.py
+│       │   ├── saliency.py
+│       │   ├── dinov2.py
+│       │   ├── aesthetics.py
+│       │   ├── places.py
+│       │   └── yolo.py
 │       ├── pipeline.py    # Batch inference: load images, run model, save CSV
 │       └── utils.py       # Shared utilities (image loading, ID parsing, etc.)
 ├── scripts/
-│   ├── run_resmem.py      # CLI entry point for ResMem scoring
-│   ├── run_emonet.py      # CLI entry point for EmoNet scoring
-│   └── run_all.py         # Run all models
+│   ├── score.py           # CLI: score arbitrary images with any model
+│   ├── run_all.py         # Run all models on shared1000
+│   └── run_{model}.py     # Per-model entry points for shared1000
 └── slurm/
     └── score_images.sbatch  # SLURM job script for GPU inference
 ```
