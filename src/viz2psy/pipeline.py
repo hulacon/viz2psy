@@ -31,7 +31,7 @@ def score_images(
     Returns
     -------
     pd.DataFrame
-        One row per image with columns: filename, filepath, and model scores.
+        One row per image with columns: filename and model scores.
     """
     image_paths = [Path(p) for p in image_paths]
 
@@ -50,7 +50,7 @@ def score_images(
         scores_list = model.predict_batch(images)
 
         for path, scores in zip(batch_paths, scores_list):
-            row = {"filename": path.name, "filepath": str(path)}
+            row = {"filename": path.name}
             row.update(scores)
             all_rows.append(row)
 

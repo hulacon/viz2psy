@@ -13,22 +13,27 @@ viz2psy/
 └── src/
     └── viz2psy/
         ├── __init__.py
-        ├── cli.py         # Command-line interface
+        ├── cli.py         # Unified CLI (images, video, HDF5)
         ├── pipeline.py    # Batch inference: score_images()
+        ├── metadata.py    # Sidecar JSON generation
+        ├── video.py       # Video frame extraction
         ├── utils.py       # Shared utilities (image loading)
-        └── models/        # One module per model
+        ├── models/        # One module per model
+        │   ├── __init__.py
+        │   ├── base.py    # Abstract base class
+        │   ├── resmem.py
+        │   ├── emonet.py
+        │   ├── clip.py
+        │   ├── gist.py
+        │   ├── llstat.py
+        │   ├── saliency.py
+        │   ├── dinov2.py
+        │   ├── aesthetics.py
+        │   ├── places.py
+        │   └── yolo.py
+        └── viz/           # Visualization tools
             ├── __init__.py
-            ├── base.py    # Abstract base class
-            ├── resmem.py
-            ├── emonet.py
-            ├── clip.py
-            ├── gist.py
-            ├── llstat.py
-            ├── saliency.py
-            ├── dinov2.py
-            ├── aesthetics.py
-            ├── places.py
-            └── yolo.py
+            └── cli.py
 ```
 
 ## Model Interface
@@ -122,3 +127,38 @@ pytest
 - Follow PEP 8
 - Keep model wrappers thin; complex logic belongs in the upstream library
 - Prefer explicit device handling over global state
+
+## CLI Input Types
+
+The unified CLI (`viz2psy`) handles three input types with automatic detection:
+
+| Input Type | Detection | Index Column | Specific Options |
+|------------|-----------|--------------|------------------|
+| Images | File extensions (.jpg, .png, etc.) | `filename` | — |
+| Video | File extensions (.mp4, .mov, etc.) | `time` | `--frame-interval`, `--save-frames` |
+| HDF5 brick | File extensions (.h5, .hdf5) | `image_idx` | `--dataset`, `--start`, `--end` |
+
+## Metadata Sidecar
+
+When output is saved to file (`-o`), a `.meta.json` sidecar is created with:
+
+```json
+{
+  "viz2psy_version": "0.1.0",
+  "created_at": "2024-...",
+  "input": { "type": "hdf5_brick", "path": "...", ... },
+  "output": { "path": "...", "rows": 1000, "columns": 2909 },
+  "index_column": "image_idx",
+  "device": "mps",
+  "total_runtime_sec": 123.4,
+  "models": {
+    "clip": { "pattern": "clip_{NNN}", "range": [0, 511], "count": 512 },
+    "emonet": { "columns": [...], "definition": "feature_definitions.emonet" }
+  },
+  "feature_definitions": { "emonet": ["Adoration", ...] }
+}
+```
+
+Feature naming:
+- **Pattern-based** (clip, dinov2, gist, saliency): `"pattern": "clip_{NNN}"` with range
+- **Named columns** (emonet, places, yolo, etc.): Full column list in `feature_definitions`

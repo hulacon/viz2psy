@@ -5,9 +5,10 @@ Extract psychological and perceptual features from images using multiple computa
 ## Features
 
 - **10 pre-integrated models** covering memorability, emotion, semantics, low-level statistics, and more
+- **Unified CLI** for images, videos, and HDF5 image bricks (e.g., NSD dataset)
 - **Consistent interface** across all models with batch processing support
-- **CLI and Python API** for flexible integration
-- **GPU acceleration** with automatic device detection
+- **Metadata sidecar files** documenting inputs, outputs, runtimes, and feature definitions
+- **GPU acceleration** with automatic device detection (CUDA, MPS)
 
 ## Installation
 
@@ -54,7 +55,18 @@ viz2psy resmem movie.mp4 --frame-interval 1.0 -o scores.csv
 
 # Save extracted frames to disk (for large videos)
 viz2psy resmem movie.mp4 --save-frames ./frames -o scores.csv
+
+# Score HDF5 image brick (e.g., NSD dataset)
+viz2psy resmem data.hdf5 -o scores.csv
+
+# HDF5 with slice selection
+viz2psy resmem data.hdf5 --dataset imgBrick --start 0 --end 1000 -o scores.csv
+
+# List datasets in HDF5 file
+viz2psy --list-datasets data.hdf5
 ```
+
+When saving to a file (`-o`), a metadata sidecar (`.meta.json`) is automatically created with input/output info, runtimes, and feature definitions.
 
 ### Python API
 

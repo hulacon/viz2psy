@@ -33,6 +33,13 @@ class SaliencyModel(BaseModel):
 
     def load(self) -> None:
         import deepgaze_pytorch
+        import torch
+
+        # DeepGaze uses float64 buffers which MPS doesn't support
+        if self.device.type == "mps":
+            import warnings
+            warnings.warn("Saliency model using CPU (MPS doesn't support float64)")
+            self.device = torch.device("cpu")
 
         self.model = deepgaze_pytorch.DeepGazeIIE(pretrained=True)
         self.model.eval()
@@ -83,6 +90,13 @@ class SaliencyModel(BaseModel):
     def predict_batch(self, images: list[Image.Image]) -> list[dict[str, float]]:
         # DeepGaze expects all images in a batch to have the same resolution.
         arrays = [np.array(img.convert("RGB")) for img in images]
+
+        # Check if all images have the same shape
+        shapes = [a.shape[:2] for a in arrays]
+        if len(set(shapes)) > 1:
+            # Different sizes - fall back to single-image processing
+            return [self.predict(img) for img in images]
+
         h, w = arrays[0].shape[:2]
 
         batch = torch.tensor(
