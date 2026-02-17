@@ -7,11 +7,23 @@ import torch
 from PIL import Image
 
 
+def _get_default_device() -> torch.device:
+    """Auto-detect the best available device."""
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    elif torch.backends.mps.is_available():
+        return torch.device("mps")
+    return torch.device("cpu")
+
+
 class BaseModel(ABC):
     """Common interface for psychological feature extraction models."""
 
-    def __init__(self):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    def __init__(self, device: str | None = None):
+        if device:
+            self.device = torch.device(device)
+        else:
+            self.device = _get_default_device()
         self.model = None
 
     @abstractmethod

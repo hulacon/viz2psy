@@ -43,6 +43,8 @@ dependencies = [
     "scikit-image>=0.21",
     "deepgaze-pytorch>=1.0",
     "ultralytics>=8.0",
+    "opencv-python>=4.8",
+    "psutil>=5.9",
 ]
 
 [project.optional-dependencies]

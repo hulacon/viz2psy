@@ -37,8 +37,23 @@ viz2psy resmem photo.jpg
 # Score multiple images and save to CSV
 viz2psy clip images/*.png -o embeddings.csv
 
+# Run multiple models at once
+viz2psy resmem clip emonet images/*.png -o scores.csv
+
+# Run all models
+viz2psy --all images/*.png -o all_scores.csv
+
 # Use CPU explicitly
 viz2psy emonet images/*.jpg --device cpu --quiet
+
+# Score video frames (default: every 0.5s)
+viz2psy resmem movie.mp4 -o scores.csv
+
+# Custom frame interval (1 second)
+viz2psy resmem movie.mp4 --frame-interval 1.0 -o scores.csv
+
+# Save extracted frames to disk (for large videos)
+viz2psy resmem movie.mp4 --save-frames ./frames -o scores.csv
 ```
 
 ### Python API
