@@ -5,8 +5,33 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "viz2psy"
 version = "0.1.0"
-description = "Visual image psychological feature extraction pipeline"
+description = "Extract psychological and perceptual features from images using multiple computational models"
+readme = "README.md"
+license = "MIT"
 requires-python = ">=3.10"
+authors = [
+    {name = "Brice Hutcheson", email = "bhutch@uoregon.edu"},
+]
+keywords = [
+    "image features",
+    "memorability",
+    "emotion",
+    "computer vision",
+    "psychology",
+    "perception",
+    "deep learning",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Image Processing",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
     "torch>=2.0",
     "torchvision>=0.15",
@@ -22,6 +47,14 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest", "ipython"]
+
+[project.scripts]
+viz2psy = "viz2psy.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/bhutch/viz2psy"
+Repository = "https://github.com/bhutch/viz2psy"
+Issues = "https://github.com/bhutch/viz2psy/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]

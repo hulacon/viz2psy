@@ -6,5 +6,4 @@ build/
 .eggs/
 *.pt
 *.pth
-slurm/logs/
 .claude/

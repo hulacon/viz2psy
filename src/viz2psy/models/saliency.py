@@ -82,7 +82,6 @@ class SaliencyModel(BaseModel):
 
     def predict_batch(self, images: list[Image.Image]) -> list[dict[str, float]]:
         # DeepGaze expects all images in a batch to have the same resolution.
-        # Our shared1000 images are all 425x425, so this should work.
         arrays = [np.array(img.convert("RGB")) for img in images]
         h, w = arrays[0].shape[:2]
 
