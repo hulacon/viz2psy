@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Score arbitrary images with any viz2psych model.
+"""Score arbitrary images with any viz2psy model.
 
 Examples
 --------
@@ -16,9 +16,9 @@ Examples
 import argparse
 from pathlib import Path
 
-from viz2psych.models.resmem import ResMemModel
-from viz2psych.models.emonet import EmoNetModel
-from viz2psych.pipeline import score_images
+from viz2psy.models.resmem import ResMemModel
+from viz2psy.models.emonet import EmoNetModel
+from viz2psy.pipeline import score_images
 
 MODELS = {
     "resmem": ResMemModel,
@@ -28,7 +28,7 @@ MODELS = {
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Score images with a viz2psych model.",
+        description="Score images with a viz2psy model.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="Example: python scripts/score.py resmem photo.jpg",
     )

@@ -4,8 +4,8 @@
 import argparse
 from pathlib import Path
 
-from viz2psych.models.resmem import ResMemModel
-from viz2psych.pipeline import run_model, DEFAULT_IMAGE_DIR, DEFAULT_STIM_INFO, DEFAULT_OUTPUT_DIR
+from viz2psy.models.resmem import ResMemModel
+from viz2psy.pipeline import run_model, DEFAULT_IMAGE_DIR, DEFAULT_STIM_INFO, DEFAULT_OUTPUT_DIR
 
 
 def main():

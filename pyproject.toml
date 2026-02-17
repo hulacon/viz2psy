@@ -3,7 +3,7 @@ requires = ["setuptools>=64", "setuptools-scm"]
 build-backend = "setuptools.backends._legacy:_Backend"
 
 [project]
-name = "viz2psych"
+name = "viz2psy"
 version = "0.1.0"
 description = "Visual image psychological feature extraction pipeline"
 requires-python = ">=3.10"

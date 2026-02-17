@@ -41,7 +41,7 @@ _emonet_transform = T.Compose([
 ])
 
 # Default cache location for downloaded weights.
-_DEFAULT_WEIGHTS_PATH = Path.home() / ".cache" / "viz2psych" / "emonet_pytorch_weights.pt"
+_DEFAULT_WEIGHTS_PATH = Path.home() / ".cache" / "viz2psy" / "emonet_pytorch_weights.pt"
 
 # OSF download URL for EmoNet weights.
 _WEIGHTS_URL = "https://osf.io/amdju/download"

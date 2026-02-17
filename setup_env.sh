@@ -1,10 +1,10 @@
 #!/bin/bash
-# Create the viz2psych conda environment on Talapas.
+# Create the viz2psy conda environment on Talapas.
 # Usage: bash setup_env.sh
 
 set -euo pipefail
 
-ENV_NAME="viz2psych"
+ENV_NAME="viz2psy"
 
 echo "Creating conda environment: ${ENV_NAME}"
 conda create -n "${ENV_NAME}" python=3.10 -y
@@ -19,8 +19,8 @@ conda install pytorch torchvision pytorch-cuda=12.4 -c pytorch -c nvidia -y
 echo "Installing Python dependencies ..."
 pip install resmem tqdm pandas Pillow
 
-echo "Installing viz2psych in editable mode ..."
-pip install -e /gpfs/projects/hulacon/bhutch/viz2psych
+echo "Installing viz2psy in editable mode ..."
+pip install -e /gpfs/projects/hulacon/bhutch/viz2psy
 
 echo ""
 echo "Done! Activate with:  conda activate ${ENV_NAME}"

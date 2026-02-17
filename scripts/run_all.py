@@ -4,13 +4,13 @@
 import argparse
 from pathlib import Path
 
-from viz2psych.models.resmem import ResMemModel
-from viz2psych.models.emonet import EmoNetModel
-from viz2psych.pipeline import run_model, DEFAULT_IMAGE_DIR, DEFAULT_STIM_INFO, DEFAULT_OUTPUT_DIR
+from viz2psy.models.resmem import ResMemModel
+from viz2psy.models.emonet import EmoNetModel
+from viz2psy.pipeline import run_model, DEFAULT_IMAGE_DIR, DEFAULT_STIM_INFO, DEFAULT_OUTPUT_DIR
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run all viz2psych models.")
+    parser = argparse.ArgumentParser(description="Run all viz2psy models.")
     parser.add_argument("--image-dir", type=Path, default=DEFAULT_IMAGE_DIR)
     parser.add_argument("--stim-info", type=Path, default=DEFAULT_STIM_INFO)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
