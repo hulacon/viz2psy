@@ -120,6 +120,7 @@ Default: auto-detect (CUDA > MPS > CPU).
 | Option | Description |
 |--------|-------------|
 | `--batch-size N` | Batch size for inference (default: 32) |
+| `--parallel` | Run multiple models in parallel (one process per model). Useful with `--all`. |
 
 ---
 
@@ -139,6 +140,9 @@ viz2psy resmem emonet aesthetics images/*.jpg -o scores.csv
 
 # Run all models (comprehensive feature extraction)
 viz2psy --all images/*.jpg -o all_features.csv
+
+# Run all models in parallel (faster on multi-core systems)
+viz2psy --all --parallel images/*.jpg -o all_features.csv
 ```
 
 ### Video Processing
@@ -243,9 +247,10 @@ This sidecar is used by `viz2psy-viz` for:
 
 1. **Use GPU**: CUDA is fastest, MPS (Apple Silicon) is good, CPU is slowest
 2. **Batch size**: Increase `--batch-size` for faster throughput (limited by GPU memory)
-3. **Video frame interval**: Use larger intervals for long videos
-4. **HDF5 slicing**: Process large datasets in chunks with `--start`/`--end`
-5. **Model selection**: Only run models you need; `--all` is comprehensive but slow
+3. **Parallel mode**: Use `--parallel` with multiple models to run them concurrently
+4. **Video frame interval**: Use larger intervals for long videos
+5. **HDF5 slicing**: Process large datasets in chunks with `--start`/`--end`
+6. **Model selection**: Only run models you need; `--all` is comprehensive but slow
 
 ---
 

@@ -14,6 +14,7 @@ viz2psy/
     └── viz2psy/
         ├── __init__.py
         ├── cli.py         # Unified CLI (images, video, HDF5)
+        ├── exceptions.py  # Structured error handling
         ├── pipeline.py    # Batch inference: score_images()
         ├── metadata.py    # Sidecar JSON generation
         ├── video.py       # Video frame extraction
@@ -21,19 +22,32 @@ viz2psy/
         ├── models/        # One module per model
         │   ├── __init__.py
         │   ├── base.py    # Abstract base class
-        │   ├── resmem.py
-        │   ├── emonet.py
+        │   ├── aesthetics.py
+        │   ├── caption.py # BLIP image captioning
         │   ├── clip.py
+        │   ├── dinov2.py
+        │   ├── emonet.py
         │   ├── gist.py
         │   ├── llstat.py
-        │   ├── saliency.py
-        │   ├── dinov2.py
-        │   ├── aesthetics.py
         │   ├── places.py
+        │   ├── resmem.py
+        │   ├── saliency.py
         │   └── yolo.py
         └── viz/           # Visualization tools
             ├── __init__.py
-            └── cli.py
+            ├── cli.py
+            ├── composite.py
+            ├── dashboard.py
+            ├── feature_config.py
+            ├── heatmap.py
+            ├── hyperplot.py
+            ├── index_utils.py
+            ├── interactive/
+            ├── projection.py
+            ├── scatter.py
+            ├── sidecar.py
+            ├── timeseries.py
+            └── wordcloud.py
 ```
 
 ## Model Interface
