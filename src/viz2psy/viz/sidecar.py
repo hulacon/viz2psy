@@ -539,11 +539,20 @@ class UnifiedImageResolver:
         row_idx: int,
     ) -> Path | None:
         """Resolve image from folder."""
-        # Try sidecar paths first (direct mapping by index)
-        if self._sidecar_paths and row_idx < len(self._sidecar_paths):
-            path = Path(self._sidecar_paths[row_idx])
-            if path.exists():
-                return path
+        # Get filename from row
+        filename = None
+        if "filename" in row.index:
+            filename = row["filename"]
+
+        # Try sidecar paths - match by filename, not by index
+        # (CSV rows may be sorted differently than input order)
+        if self._sidecar_paths and filename:
+            basename = Path(filename).name
+            for sidecar_path in self._sidecar_paths:
+                if Path(sidecar_path).name == basename:
+                    path = Path(sidecar_path)
+                    if path.exists():
+                        return path
 
         # Fall back to filename-based resolution
         return self._file_resolver.resolve(row)

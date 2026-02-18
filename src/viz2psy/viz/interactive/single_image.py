@@ -5,6 +5,7 @@ Provides a two-panel layout:
 - Right: Selectable feature visualizations
 
 Feature visualization options:
+- Caption text display (caption model)
 - Emotion bar chart (emonet)
 - Emotion spider/radar plot (emonet)
 - Saliency heatmap
@@ -233,6 +234,10 @@ def _get_available_features(row: pd.Series) -> dict[str, list[str]]:
     places_cols = [c for c in row.index if c.startswith("places_")]
     if places_cols:
         available["places"] = places_cols
+
+    # Check for caption
+    if "caption" in row.index and pd.notna(row["caption"]):
+        available["caption"] = ["caption"]
 
     return available
 
@@ -551,12 +556,14 @@ def create_single_image_viewer(
         Row index in scores_df for this image.
     panels : list of str, optional
         Which feature panels to include. Options:
+        - "caption": Text display of image caption
         - "emotions_bar": Horizontal bar chart of emotions
         - "emotions_spider": Radar plot of emotions
         - "scalars": Bar chart of memorability, aesthetics, etc.
         - "saliency": Saliency heatmap
         - "yolo": Top YOLO detections
         - "places": Top Places predictions
+        - "wordcloud": CLIP word cloud (requires wordcloud package)
         If None, auto-detects available features.
     width : int
         Total figure width.
@@ -599,6 +606,8 @@ def create_single_image_viewer(
     # Determine which panels to show
     if panels is None:
         panels = []
+        if "caption" in available:
+            panels.append("caption")
         if "emotions" in available:
             panels.append("emotions_bar")
         if "scalars" in available:
@@ -777,6 +786,7 @@ def _panel_label(panel_type: str) -> str:
         "yolo": "Objects (YOLO)",
         "places": "Scenes (Places)",
         "wordcloud": "Word Cloud (CLIP)",
+        "caption": "Caption",
     }
     return labels.get(panel_type, panel_type)
 
@@ -1094,6 +1104,35 @@ def _add_feature_panel_with_config(
                 "visible": False,
             })
 
+    elif panel_type == "caption" and "caption" in available:
+        caption_text = str(data_row.get("caption", ""))
+
+        # Display caption as centered text
+        fig.add_trace(go.Scatter(
+            x=[0.5],
+            y=[0.5],
+            mode="text",
+            text=[f"<b>Caption:</b><br><br><i>{caption_text}</i>"],
+            textfont=dict(size=16, color="#333"),
+            textposition="middle center",
+            hoverinfo="skip",
+            showlegend=False,
+        ), row=subplot_row, col=subplot_col)
+
+        axis_config["xaxis"].update({
+            "title": {"text": ""},
+            "range": [0, 1],
+            "autorange": False,
+            "visible": False,
+            "scaleanchor": None,
+        })
+        axis_config["yaxis"].update({
+            "title": {"text": ""},
+            "range": [0, 1],
+            "autorange": False,
+            "visible": False,
+        })
+
     return axis_config
 
 
@@ -1357,6 +1396,8 @@ def create_browsable_viewer(
     # Determine which panels to show
     if panels is None:
         panels = []
+        if "caption" in available:
+            panels.append("caption")
         if "emotions" in available:
             panels.append("emotions_bar")
         if "scalars" in available:
@@ -1658,6 +1699,18 @@ def _create_panel_trace(panel_type: str, feature_data: dict, visible: bool | Non
                 textfont=dict(size=14, color="gray"),
                 hoverinfo="skip",
             )
+    elif panel_type == "caption":
+        caption_text = feature_data.get("caption", "")
+        trace = go.Scatter(
+            x=[0.5],
+            y=[0.5],
+            mode="text",
+            text=[f"<b>Caption:</b><br><br><i>{caption_text}</i>"],
+            textfont=dict(size=16, color="#333"),
+            textposition="middle center",
+            hoverinfo="skip",
+            showlegend=False,
+        )
     else:
         trace = go.Bar(x=[], y=[])
 
@@ -1682,6 +1735,9 @@ def _apply_panel_axis_config(fig: go.Figure, panel_type: str, img_aspect: float 
     elif panel_type == "wordcloud":
         fig.update_yaxes(autorange="reversed", visible=False, scaleanchor="x", scaleratio=1.0)
         fig.update_xaxes(visible=False, constrain="domain")
+    elif panel_type == "caption":
+        fig.update_yaxes(range=[0, 1], visible=False, scaleanchor=None)
+        fig.update_xaxes(range=[0, 1], visible=False, scaleanchor=None, constrain=None)
     elif panel_type == "emotions_spider":
         pass  # Polar axes handled differently
 
@@ -1755,6 +1811,24 @@ def _get_panel_axis_updates(panel_type: str, img_aspect: float = 1.0) -> dict:
             "xaxis": {
                 "visible": False,
                 "constrain": "domain",
+                "domain": base_x_domain,
+            },
+        }
+    elif panel_type == "caption":
+        return {
+            "yaxis": {
+                "range": [0, 1],
+                "autorange": False,
+                "visible": False,
+                "scaleanchor": None,
+                "domain": base_y_domain,
+            },
+            "xaxis": {
+                "range": [0, 1],
+                "autorange": False,
+                "visible": False,
+                "scaleanchor": None,
+                "constrain": None,
                 "domain": base_x_domain,
             },
         }
@@ -1862,6 +1936,10 @@ def _extract_panel_data(
             data = {"image_array": img_array.tolist()}
         else:
             data = {"image_array": None}
+
+    elif panel_type == "caption" and "caption" in available:
+        caption_text = str(row.get("caption", ""))
+        data = {"caption": caption_text}
 
     return data
 

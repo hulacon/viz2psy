@@ -53,6 +53,7 @@ MODEL_REGISTRY = {
     "resmem": ("viz2psy.models.resmem", "ResMemModel", "Image memorability (0-1)"),
     "emonet": ("viz2psy.models.emonet", "EmoNetModel", "20 emotion category probabilities"),
     "clip": ("viz2psy.models.clip", "CLIPModel", "512-dim CLIP ViT-B-32 embeddings"),
+    "caption": ("viz2psy.models.caption", "CaptionModel", "Natural language image captions (BLIP)"),
     "gist": ("viz2psy.models.gist", "GISTModel", "512-dim Gabor spatial envelope features"),
     "llstat": ("viz2psy.models.llstat", "LLStatModel", "17 low-level image statistics"),
     "saliency": ("viz2psy.models.saliency", "SaliencyModel", "576-dim fixation density grid"),
@@ -486,6 +487,89 @@ def _process_images(
     return result_df
 
 
+def _generate_visualizations(
+    output_path: Path,
+    result_df,
+    metadata,
+    input_type: str,
+    video_path: Path | None = None,
+    frames_dir: Path | None = None,
+    hdf5_path: Path | None = None,
+    hdf5_dataset: str | None = None,
+    image_paths: list[Path] | None = None,
+    quiet: bool = False,
+):
+    """Generate dashboard and browse viewer HTML files after processing."""
+    import pandas as pd
+    from viz2psy.viz.dashboard import create_dashboard
+    from viz2psy.viz.interactive.single_image import create_browsable_viewer
+    from viz2psy.viz.interactive.base import save_figure
+    from viz2psy.viz.sidecar import load_sidecar, UnifiedImageResolver
+
+    sidecar = load_sidecar(output_path)
+
+    # Create image resolver based on input type
+    image_resolver = None
+    try:
+        resolver_kwargs = {
+            "csv_path": output_path,
+            "sidecar": sidecar,
+        }
+        if video_path:
+            resolver_kwargs["video_path"] = video_path
+        if frames_dir:
+            resolver_kwargs["frames_dir"] = frames_dir
+        if hdf5_path:
+            resolver_kwargs["hdf5_path"] = hdf5_path
+        if image_paths:
+            # Use parent of first image as image_root
+            resolver_kwargs["image_root"] = image_paths[0].parent
+
+        image_resolver = UnifiedImageResolver(**resolver_kwargs)
+    except Exception as e:
+        if not quiet:
+            print(f"Note: Could not set up image resolver for viz: {e}")
+
+    # Generate dashboard
+    dashboard_path = output_path.parent / f"{output_path.stem}_dashboard.html"
+    try:
+        html = create_dashboard(
+            result_df,
+            sidecar=sidecar,
+            image_resolver=image_resolver,
+            width=900,
+            height=600,
+            max_thumbnails=100,
+        )
+        with open(dashboard_path, "w") as f:
+            f.write(html)
+        if not quiet:
+            print(f"Dashboard saved to {dashboard_path}")
+    except Exception as e:
+        if not quiet:
+            print(f"Note: Could not generate dashboard: {e}")
+
+    # Generate browse viewer
+    browse_path = output_path.parent / f"{output_path.stem}_browse.html"
+    try:
+        fig = create_browsable_viewer(
+            scores_df=result_df,
+            image_resolver=image_resolver,
+            panels=None,  # auto-detect
+            width=1200,
+            height=700,
+            max_rows=100,
+            sidecar=sidecar,
+            normalize_scalars=True,
+        )
+        save_figure(fig, browse_path)
+        if not quiet:
+            print(f"Browse viewer saved to {browse_path}")
+    except Exception as e:
+        if not quiet:
+            print(f"Note: Could not generate browse viewer: {e}")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Extract psychological/perceptual features from images, videos, or HDF5 bricks.",
@@ -579,6 +663,11 @@ def main():
         action="store_true",
         help="List datasets in HDF5 file and exit.",
     )
+    parser.add_argument(
+        "--no-viz",
+        action="store_true",
+        help="Skip generating HTML visualizations (dashboard and browse viewer).",
+    )
 
     args = parser.parse_args()
 
@@ -629,6 +718,14 @@ def main():
     # Initialize metadata builder (only save if output is specified)
     metadata = MetadataBuilder() if args.output else None
 
+    # Track input info for viz generation
+    input_type = None
+    video_path = None
+    frames_dir = None
+    hdf5_path = None
+    hdf5_dataset = None
+    image_paths = None
+
     try:
         if len(inputs) == 1 and is_hdf5_file(inputs[0]):
             # HDF5 processing
@@ -648,6 +745,10 @@ def main():
             output_path = args.output
             if output_path is None:
                 output_path = hdf5_path.with_name(hdf5_path.stem + "_scores.csv")
+
+            input_type = "hdf5_brick"
+            hdf5_path = inputs[0]
+            hdf5_dataset = dataset_name
 
             result_df = _process_hdf5(
                 hdf5_path=hdf5_path,
@@ -671,6 +772,9 @@ def main():
             if args.start != 0 or args.end is not None:
                 print("Warning: --start/--end are only used with HDF5 input.", file=sys.stderr)
 
+            input_type = "video"
+            video_path = inputs[0]
+
             # Determine save_frames directory
             # Default: save frames alongside output (unless --no-save-frames)
             save_frames_dir = args.save_frames
@@ -683,8 +787,10 @@ def main():
                     # e.g., video.mp4 -> video_frames/
                     save_frames_dir = inputs[0].parent / (inputs[0].stem + "_frames")
 
+            frames_dir = save_frames_dir
+
             result_df = _process_video(
-                video_path=inputs[0],
+                video_path=video_path,
                 models=models,
                 frame_interval=args.frame_interval,
                 save_frames=save_frames_dir,
@@ -704,8 +810,11 @@ def main():
             if args.start != 0 or args.end is not None:
                 print("Warning: --start/--end are only used with HDF5 input.", file=sys.stderr)
 
+            input_type = "image_folder"
+            image_paths = inputs
+
             result_df = _process_images(
-                image_paths=inputs,
+                image_paths=image_paths,
                 models=models,
                 batch_size=args.batch_size,
                 device=args.device,
@@ -723,6 +832,23 @@ def main():
             if not args.quiet:
                 print(f"Saved {len(result_df)} rows to {args.output}")
                 print(f"Metadata saved to {meta_path}")
+
+            # Generate visualizations (unless --no-viz)
+            if not args.no_viz:
+                if not args.quiet:
+                    print()
+                _generate_visualizations(
+                    output_path=args.output,
+                    result_df=result_df,
+                    metadata=metadata,
+                    input_type=input_type,
+                    video_path=video_path,
+                    frames_dir=frames_dir,
+                    hdf5_path=hdf5_path,
+                    hdf5_dataset=hdf5_dataset,
+                    image_paths=image_paths,
+                    quiet=args.quiet,
+                )
         else:
             print(result_df.to_string(index=False))
 

@@ -1,6 +1,6 @@
 # Models
 
-viz2psy provides wrappers for 10 computational models covering memorability, emotion, semantics, low-level statistics, and visual attention.
+viz2psy provides wrappers for 11 computational models covering memorability, emotion, semantics, captioning, low-level statistics, and visual attention.
 
 ## Overview
 
@@ -9,6 +9,7 @@ viz2psy provides wrappers for 10 computational models covering memorability, emo
 | `resmem` | 1 score | Memory | Image memorability prediction |
 | `emonet` | 20 scores | Emotion | Emotion category probabilities |
 | `clip` | 512 dims | Semantics | Vision-language embeddings |
+| `caption` | 1 caption | Captioning | Natural language image captions (BLIP) |
 | `dinov2` | 768 dims | Semantics | Self-supervised visual features |
 | `gist` | 512 dims | Scene | Spatial envelope descriptor |
 | `places` | 467 scores | Scene | Scene categories + attributes |
@@ -68,6 +69,37 @@ Extracts vision-language embeddings using OpenAI's CLIP model.
 ```python
 from viz2psy.models.clip import CLIPModel
 model = CLIPModel()
+```
+
+---
+
+## Captioning
+
+### caption
+
+Generates natural language captions describing image content using BLIP.
+
+- **Output**: Single `caption` string column
+- **Model**: Salesforce BLIP (large by default)
+- **Use cases**: Image description, accessibility, content understanding, metadata
+- **Reference**: Li, J., et al. (2022). BLIP: Bootstrapping Language-Image Pre-training for Unified Vision-Language Understanding and Generation. *ICML*.
+
+```python
+from viz2psy.models.caption import CaptionModel
+
+# Default (large model)
+model = CaptionModel()
+
+# Use smaller/faster base model
+model = CaptionModel(model_name="Salesforce/blip-image-captioning-base")
+```
+
+Example output:
+```
+caption
+"a man playing tennis on a tennis court"
+"a sunset over the ocean with palm trees"
+"a close up of a red flower with water droplets"
 ```
 
 ### dinov2
