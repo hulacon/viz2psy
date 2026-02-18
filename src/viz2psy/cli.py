@@ -165,6 +165,143 @@ def _clear_gpu_memory():
         pass
 
 
+def _process_single_model_images(
+    model_name: str,
+    image_paths: list[Path],
+    batch_size: int,
+    device: str | None,
+    quiet: bool,
+) -> tuple[str, list[dict], list[str], float, str]:
+    """Worker function to process images with a single model.
+
+    Returns (model_name, scores_list, feature_names, elapsed, device_used).
+    """
+    import time
+    from tqdm import tqdm
+    from viz2psy.utils import load_image
+
+    model_cls = _load_model_class(model_name)
+    model = model_cls(device=device) if device else model_cls()
+
+    if not quiet:
+        print(f"[{model_name}] Loading on {model.device}...")
+    model.load()
+    device_used = str(model.device)
+
+    start_time = time.time()
+    all_scores = []
+
+    iterator = range(0, len(image_paths), batch_size)
+    if not quiet:
+        iterator = tqdm(iterator, desc=model_name, position=0, leave=True)
+
+    for batch_start in iterator:
+        batch_paths = image_paths[batch_start : batch_start + batch_size]
+        images = [load_image(p) for p in batch_paths]
+        scores_list = model.predict_batch(images)
+        all_scores.extend(scores_list)
+
+    elapsed = time.time() - start_time
+    feature_names = list(all_scores[0].keys()) if all_scores else []
+
+    return (model_name, all_scores, feature_names, elapsed, device_used)
+
+
+def _process_single_model_video(
+    model_name: str,
+    image_paths: list[Path],
+    batch_size: int,
+    device: str | None,
+    quiet: bool,
+) -> tuple[str, list[dict], list[str], float, str]:
+    """Worker function to process video frames with a single model.
+
+    Frames are passed as paths (saved to disk). Returns same as images worker.
+    """
+    import time
+    from tqdm import tqdm
+    from viz2psy.utils import load_image
+
+    model_cls = _load_model_class(model_name)
+    model = model_cls(device=device) if device else model_cls()
+
+    if not quiet:
+        print(f"[{model_name}] Loading on {model.device}...")
+    model.load()
+    device_used = str(model.device)
+
+    # Load images from paths
+    images = [load_image(p) for p in image_paths]
+
+    start_time = time.time()
+    all_scores = []
+
+    iterator = range(0, len(images), batch_size)
+    if not quiet:
+        iterator = tqdm(iterator, desc=model_name, position=0, leave=True)
+
+    for batch_start in iterator:
+        batch = images[batch_start : batch_start + batch_size]
+        scores_list = model.predict_batch(batch)
+        all_scores.extend(scores_list)
+
+    elapsed = time.time() - start_time
+    feature_names = list(all_scores[0].keys()) if all_scores else []
+
+    return (model_name, all_scores, feature_names, elapsed, device_used)
+
+
+def _process_single_model_hdf5(
+    model_name: str,
+    hdf5_path: Path,
+    dataset_name: str,
+    start_idx: int,
+    end_idx: int,
+    batch_size: int,
+    device: str | None,
+    quiet: bool,
+) -> tuple[str, list[dict], list[str], float, str]:
+    """Worker function to process HDF5 images with a single model.
+
+    Each worker opens the HDF5 file independently.
+    """
+    import time
+    import h5py
+    from PIL import Image
+    from tqdm import tqdm
+
+    model_cls = _load_model_class(model_name)
+    model = model_cls(device=device) if device else model_cls()
+
+    if not quiet:
+        print(f"[{model_name}] Loading on {model.device}...")
+    model.load()
+    device_used = str(model.device)
+
+    start_time = time.time()
+    all_scores = []
+
+    with h5py.File(hdf5_path, "r") as f:
+        dataset = f[dataset_name]
+
+        iterator = range(start_idx, end_idx, batch_size)
+        if not quiet:
+            n_batches = (end_idx - start_idx + batch_size - 1) // batch_size
+            iterator = tqdm(iterator, desc=model_name, total=n_batches, unit="batch")
+
+        for batch_start in iterator:
+            batch_end = min(batch_start + batch_size, end_idx)
+            batch_arrays = dataset[batch_start:batch_end]
+            batch_images = [Image.fromarray(arr, mode="RGB") for arr in batch_arrays]
+            scores_list = model.predict_batch(batch_images)
+            all_scores.extend(scores_list)
+
+    elapsed = time.time() - start_time
+    feature_names = list(all_scores[0].keys()) if all_scores else []
+
+    return (model_name, all_scores, feature_names, elapsed, device_used)
+
+
 def _cuda_available() -> bool:
     try:
         import torch
@@ -192,6 +329,7 @@ def _process_hdf5(
     device: str | None = None,
     quiet: bool = False,
     metadata=None,
+    parallel: bool = False,
 ):
     """Process an HDF5 image brick with multiple models."""
     import time
@@ -202,6 +340,7 @@ def _process_hdf5(
     from PIL import Image
     from tqdm import tqdm
 
+    # Get dataset info first
     with h5py.File(hdf5_path, "r") as f:
         dataset = f[dataset_name]
         n_total = dataset.shape[0]
@@ -212,19 +351,75 @@ def _process_hdf5(
         end_idx = min(end_idx, n_total)
         n_to_process = end_idx - start_idx
 
-        # Set metadata input info
-        if metadata:
-            metadata.set_input_hdf5(hdf5_path, dataset_name, start_idx, end_idx)
+    # Set metadata input info
+    if metadata:
+        metadata.set_input_hdf5(hdf5_path, dataset_name, start_idx, end_idx)
+
+    if not quiet:
+        print(f"HDF5 file: {hdf5_path}")
+        print(f"Dataset: {dataset_name}")
+        print(f"Total images: {n_total:,} @ {img_shape[0]}x{img_shape[1]}")
+        print(f"Processing: indices {start_idx:,} to {end_idx:,} ({n_to_process:,} images)")
+        print(f"Output: {output_path}")
+        print()
+
+    if parallel and len(models) > 1:
+        # Parallel execution: one process per model
+        from concurrent.futures import ProcessPoolExecutor, as_completed
 
         if not quiet:
-            print(f"HDF5 file: {hdf5_path}")
-            print(f"Dataset: {dataset_name}")
-            print(f"Total images: {n_total:,} @ {img_shape[0]}x{img_shape[1]}")
-            print(f"Processing: indices {start_idx:,} to {end_idx:,} ({n_to_process:,} images)")
-            print(f"Output: {output_path}")
-            print()
+            print(f"Running {len(models)} models in parallel...")
 
+        futures = {}
+        with ProcessPoolExecutor(max_workers=len(models)) as executor:
+            for model_name in models:
+                future = executor.submit(
+                    _process_single_model_hdf5,
+                    model_name,
+                    hdf5_path,
+                    dataset_name,
+                    start_idx,
+                    end_idx,
+                    batch_size,
+                    device,
+                    quiet,
+                )
+                futures[future] = model_name
+
+            # Collect results
+            results = {}
+            for future in as_completed(futures):
+                model_name = futures[future]
+                try:
+                    name, scores, feature_names, elapsed, device_used = future.result()
+                    results[name] = (scores, feature_names, elapsed, device_used)
+                    if not quiet:
+                        rate = n_to_process / elapsed if elapsed > 0 else 0
+                        print(f"[{name}] Completed in {elapsed:.1f}s ({rate:.1f} img/s)")
+                except Exception as e:
+                    raise InferenceError(model_name, str(e)) from e
+
+        # Build result DataFrame
         all_results = {"image_idx": list(range(start_idx, end_idx))}
+        for model_name in models:
+            scores, feature_names, elapsed, device_used = results[model_name]
+
+            if metadata and metadata.device is None:
+                metadata.set_device(device_used)
+
+            for feat_name in feature_names:
+                all_results[feat_name] = [r[feat_name] for r in scores]
+
+            if metadata:
+                metadata.add_model(model_name, feature_names, elapsed)
+
+        return pd.DataFrame(all_results)
+
+    # Sequential execution (original behavior)
+    all_results = {"image_idx": list(range(start_idx, end_idx))}
+
+    with h5py.File(hdf5_path, "r") as f:
+        dataset = f[dataset_name]
 
         for model_name in models:
             # Load model
@@ -304,6 +499,7 @@ def _process_video(
     device: str | None,
     quiet: bool,
     metadata=None,
+    parallel: bool = False,
 ):
     """Process a video file and return a DataFrame with time-based scores."""
     from viz2psy.pipeline import score_images
@@ -335,7 +531,7 @@ def _process_video(
     if metadata:
         metadata.set_input_video(video_path, frame_interval, n_frames, save_frames)
 
-    # Warn if memory might be an issue
+    # For parallel mode, we need frames on disk
     use_temp_dir = False
     temp_dir = None
     if save_frames:
@@ -348,6 +544,16 @@ def _process_video(
             save_dir=save_frames,
             quiet=quiet,
         )
+    elif parallel and len(models) > 1:
+        # Parallel mode requires frames on disk
+        if not quiet:
+            print("  Saving frames to temp directory for parallel processing...")
+        frames, temp_dir = extract_frames_to_temp(
+            video_path,
+            frame_interval=frame_interval,
+            quiet=quiet,
+        )
+        use_temp_dir = True
     elif estimated_mem > available_mem * 0.8:
         # Memory might be tight, use temp directory
         if not quiet:
@@ -374,6 +580,59 @@ def _process_video(
         times = [t for t, _ in frames]
         images_or_paths = [img for _, img in frames]
 
+        # Parallel execution with frames on disk
+        if parallel and len(models) > 1 and (save_frames or use_temp_dir):
+            from concurrent.futures import ProcessPoolExecutor, as_completed
+            import pandas as pd
+
+            frame_paths = list(images_or_paths)  # These are paths
+
+            if not quiet:
+                print(f"Running {len(models)} models in parallel...")
+
+            futures = {}
+            with ProcessPoolExecutor(max_workers=len(models)) as executor:
+                for model_name in models:
+                    future = executor.submit(
+                        _process_single_model_video,
+                        model_name,
+                        frame_paths,
+                        batch_size,
+                        device,
+                        quiet,
+                    )
+                    futures[future] = model_name
+
+                # Collect results
+                results = {}
+                for future in as_completed(futures):
+                    model_name = futures[future]
+                    try:
+                        name, scores, feature_names, elapsed, device_used = future.result()
+                        results[name] = (scores, feature_names, elapsed, device_used)
+                        if not quiet:
+                            print(f"[{name}] Completed in {elapsed:.1f}s")
+                    except Exception as e:
+                        raise InferenceError(model_name, str(e)) from e
+
+            # Build result DataFrame
+            result_df = pd.DataFrame({"time": times})
+            for model_name in models:
+                scores, feature_names, elapsed, device_used = results[model_name]
+
+                if metadata and metadata.device is None:
+                    metadata.set_device(device_used)
+
+                scores_df = pd.DataFrame(scores)
+                for col in scores_df.columns:
+                    result_df[col] = scores_df[col]
+
+                if metadata:
+                    metadata.add_model(model_name, feature_names, elapsed)
+
+            return result_df
+
+        # Sequential execution (original behavior)
         # If we have paths, load them as PIL images for scoring
         if save_frames or use_temp_dir:
             from viz2psy.utils import load_image
@@ -444,15 +703,68 @@ def _process_images(
     device: str | None,
     quiet: bool,
     metadata=None,
+    parallel: bool = False,
 ):
     """Process image files and return a DataFrame."""
     import time
+    import pandas as pd
     from viz2psy.pipeline import score_images
 
     # Set metadata input info
     if metadata:
         metadata.set_input_images(image_paths)
 
+    if parallel and len(models) > 1:
+        # Parallel execution: one process per model
+        from concurrent.futures import ProcessPoolExecutor, as_completed
+
+        if not quiet:
+            print(f"Running {len(models)} models in parallel...")
+
+        futures = {}
+        with ProcessPoolExecutor(max_workers=len(models)) as executor:
+            for model_name in models:
+                future = executor.submit(
+                    _process_single_model_images,
+                    model_name,
+                    image_paths,
+                    batch_size,
+                    device,
+                    quiet,
+                )
+                futures[future] = model_name
+
+            # Collect results as they complete
+            results = {}
+            for future in as_completed(futures):
+                model_name = futures[future]
+                try:
+                    name, scores, feature_names, elapsed, device_used = future.result()
+                    results[name] = (scores, feature_names, elapsed, device_used)
+                    if not quiet:
+                        print(f"[{name}] Completed in {elapsed:.1f}s")
+                except Exception as e:
+                    raise InferenceError(model_name, str(e)) from e
+
+        # Build result DataFrame using concat to avoid fragmentation
+        dfs_to_concat = [pd.DataFrame({"filename": [p.name for p in image_paths]})]
+        for model_name in models:
+            scores, feature_names, elapsed, device_used = results[model_name]
+
+            # Track device for metadata
+            if metadata and metadata.device is None:
+                metadata.set_device(device_used)
+
+            # Collect scores DataFrame
+            dfs_to_concat.append(pd.DataFrame(scores))
+
+            # Record model metadata
+            if metadata:
+                metadata.add_model(model_name, feature_names, elapsed)
+
+        return pd.concat(dfs_to_concat, axis=1)
+
+    # Sequential execution (original behavior)
     result_df = None
     for model_name in models:
         model_cls = _load_model_class(model_name)
@@ -668,6 +980,11 @@ def main():
         action="store_true",
         help="Skip generating HTML visualizations (dashboard and browse viewer).",
     )
+    parser.add_argument(
+        "--parallel",
+        action="store_true",
+        help="Run multiple models in parallel (one process per model). Useful with --all.",
+    )
 
     args = parser.parse_args()
 
@@ -761,6 +1078,7 @@ def main():
                 device=args.device,
                 quiet=args.quiet,
                 metadata=metadata,
+                parallel=args.parallel,
             )
             # Override output path for HDF5 (it has default)
             args.output = output_path
@@ -798,6 +1116,7 @@ def main():
                 device=args.device,
                 quiet=args.quiet,
                 metadata=metadata,
+                parallel=args.parallel,
             )
         else:
             # Image processing
@@ -820,6 +1139,7 @@ def main():
                 device=args.device,
                 quiet=args.quiet,
                 metadata=metadata,
+                parallel=args.parallel,
             )
 
         if args.output:
