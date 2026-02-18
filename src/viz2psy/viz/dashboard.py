@@ -25,7 +25,7 @@ from plotly.subplots import make_subplots
 from .feature_config import FEATURE_CONFIGS, detect_models_in_dataframe
 from .projection import compute_projection
 from .index_utils import detect_index_column, prepare_index_values, is_video_data
-from .interactive.single_image import create_single_image_viewer
+from .interactive.single_image import create_single_image_viewer, create_browsable_viewer
 
 if TYPE_CHECKING:
     from PIL import Image
@@ -297,13 +297,19 @@ def _create_timeseries_trace(
     elif config.timeseries_mode == "none":
         return []
 
+    # Create customdata for click handling (row indices)
+    n_points = len(df)
+    customdata = np.arange(n_points).reshape(-1, 1)
+
     traces = []
     for col in cols:
         traces.append(go.Scatter(
             x=x_values,
             y=df[col].values,
-            mode="lines",
+            mode="lines+markers",
             name=col,
+            customdata=customdata,
+            marker=dict(size=6, opacity=0.7),
             hovertemplate=f"{col}<br>{x_label}: %{{x}}<br>Value: %{{y:.4f}}<extra></extra>",
         ))
 
@@ -758,74 +764,78 @@ def create_dashboard(
                     "title": f"{model} - Animated Trajectory",
                 }
 
-    # Pre-compute single-image viewer HTMLs for click-to-open feature
-    viewer_htmls = []
+    # Create ONE browsable viewer with slider for all frames
+    # This replaces the per-frame viewers - much more efficient
     n_rows = len(df)
-    has_resolver = image_resolver is not None
+    browsable_viewer_html = ""
 
-    if has_resolver and max_thumbnails > 0:
-        print(f"Pre-rendering {min(n_rows, max_thumbnails)} single-image viewers...")
-        for i in range(n_rows):
-            if i < max_thumbnails:
-                try:
-                    # Get image for this row
-                    img = image_resolver.resolve(df, i)
-
-                    # Generate row label for title
-                    row = df.iloc[i]
-                    if index_col and index_col in df.columns:
-                        val = row[index_col]
-                        if index_type == "time":
-                            img_title = f"Frame at {val:.2f}s"
-                        elif index_type == "ordinal":
-                            img_title = str(val)[:50]
-                        else:
-                            img_title = f"Row {i}"
-                    else:
-                        img_title = f"Row {i}"
-
-                    # Create full single-image viewer figure
-                    fig = create_single_image_viewer(
-                        image=img,
-                        scores_df=df,
-                        row_idx=i,
-                        panels=None,  # Auto-detect
-                        width=1100,
-                        height=650,
-                        sidecar=sidecar,
-                        normalize_scalars=True,
-                        image_title=img_title,
-                    )
-
-                    # Convert to standalone HTML
-                    viewer_html = fig.to_html(
-                        full_html=True,
-                        include_plotlyjs='cdn',
-                        config={'displayModeBar': True, 'responsive': True},
-                    )
-                    viewer_htmls.append(viewer_html)
-                except Exception as e:
-                    # Fallback to simple viewer on error
-                    viewer_html = _generate_single_image_viewer_html(
-                        df, i, None, index_col, index_type
-                    )
-                    viewer_htmls.append(viewer_html)
-            else:
-                # Beyond max_thumbnails - use simple fallback
-                viewer_html = _generate_single_image_viewer_html(
-                    df, i, None, index_col, index_type
-                )
-                viewer_htmls.append(viewer_html)
-    else:
-        # No image resolver - generate simple viewers for all rows
-        for i in range(n_rows):
-            viewer_html = _generate_single_image_viewer_html(
-                df, i, None, index_col, index_type
+    if image_resolver is not None:
+        print(f"Pre-rendering browsable viewer with {n_rows} frames...")
+        try:
+            fig = create_browsable_viewer(
+                scores_df=df,
+                image_resolver=image_resolver,
+                panels=None,  # Auto-detect
+                width=1100,
+                height=700,
+                max_rows=n_rows,  # Include all rows
+                sidecar=sidecar,
+                normalize_scalars=True,
             )
-            viewer_htmls.append(viewer_html)
 
-    # Build the HTML
-    return _build_dashboard_html(viz_data, detected_models, viewer_htmls, width, height)
+            # Convert to HTML
+            browsable_viewer_html = fig.to_html(
+                full_html=True,
+                include_plotlyjs='cdn',
+                config={'displayModeBar': True, 'responsive': True},
+            )
+
+            # Inject jumpToFrame function into the HTML
+            jump_script = '''
+<script>
+function jumpToFrame(idx) {
+    const plotDiv = document.querySelector('.plotly-graph-div');
+    if (plotDiv && plotDiv._fullLayout && plotDiv._fullLayout.sliders) {
+        // Animate to the target frame
+        Plotly.animate(plotDiv, [String(idx)], {
+            mode: 'immediate',
+            transition: {duration: 0},
+            frame: {duration: 0, redraw: true}
+        });
+        // Update slider position
+        const slider = plotDiv._fullLayout.sliders[0];
+        if (slider) {
+            Plotly.relayout(plotDiv, {'sliders[0].active': idx});
+        }
+    }
+}
+// Check for jump parameter on load
+window.addEventListener('load', function() {
+    const params = new URLSearchParams(window.location.search);
+    const jumpIdx = params.get('frame');
+    if (jumpIdx !== null) {
+        setTimeout(() => jumpToFrame(parseInt(jumpIdx)), 500);
+    }
+    // Also check for message from parent
+    window.addEventListener('message', function(e) {
+        if (e.data && e.data.type === 'jumpToFrame') {
+            jumpToFrame(e.data.idx);
+        }
+    });
+});
+</script>
+'''
+            browsable_viewer_html = browsable_viewer_html.replace('</body>', jump_script + '</body>')
+
+        except Exception as e:
+            print(f"Warning: Could not create browsable viewer: {e}")
+            browsable_viewer_html = f"<html><body><h1>Error creating viewer</h1><p>{e}</p></body></html>"
+    else:
+        print("No image resolver - browsable viewer not available")
+        browsable_viewer_html = "<html><body><h1>No images available</h1></body></html>"
+
+    # Build the HTML (pass browsable viewer instead of per-frame viewers)
+    return _build_dashboard_html(viz_data, detected_models, browsable_viewer_html, width, height)
 
 
 def _numpy_to_python(obj):
@@ -846,7 +856,7 @@ def _numpy_to_python(obj):
 def _build_dashboard_html(
     viz_data: dict,
     models: list[str],
-    viewer_htmls: list[str],
+    browsable_viewer_html: str,
     width: int,
     height: int,
 ) -> str:
@@ -1100,8 +1110,8 @@ def _build_dashboard_html(
         const frames = {json.dumps(frames_json)};
         const availability = {json.dumps(availability_json)};
         const modelInfo = {json.dumps(model_info)};
-        // Viewer HTMLs are base64 encoded to avoid escaping issues
-        const viewerHtmlsB64 = {json.dumps([base64.b64encode(h.encode()).decode() for h in viewer_htmls])};
+        // Single browsable viewer HTML (base64 encoded)
+        const browsableViewerB64 = "{base64.b64encode(browsable_viewer_html.encode()).decode()}";
 
         // State
         let currentModel = '{models[0] if models else ""}';
@@ -1110,6 +1120,7 @@ def _build_dashboard_html(
             clustering: '2d',
             trajectory: 'static'
         }};
+        let viewerWindow = null;
 
         // Warning messages for unavailable combinations
         const warnings = {{
@@ -1127,18 +1138,27 @@ def _build_dashboard_html(
             }}
         }};
 
-        // Open single-image viewer in new tab
+        // Open browsable viewer and jump to specific frame
         function openViewer(rowIdx) {{
-            if (rowIdx < 0 || rowIdx >= viewerHtmlsB64.length) return;
+            const viewerHtml = atob(browsableViewerB64);
 
-            // Decode base64
-            const viewerHtml = atob(viewerHtmlsB64[rowIdx]);
-            const newWindow = window.open('', '_blank');
-            if (newWindow) {{
-                newWindow.document.write(viewerHtml);
-                newWindow.document.close();
+            if (viewerWindow && !viewerWindow.closed) {{
+                // Reuse existing window - just send message to jump
+                viewerWindow.postMessage({{type: 'jumpToFrame', idx: rowIdx}}, '*');
+                viewerWindow.focus();
             }} else {{
-                alert('Popup blocked. Please allow popups for this site.');
+                // Open new window with viewer
+                viewerWindow = window.open('', '_blank');
+                if (viewerWindow) {{
+                    viewerWindow.document.write(viewerHtml);
+                    viewerWindow.document.close();
+                    // Wait for load then jump to frame
+                    setTimeout(() => {{
+                        viewerWindow.postMessage({{type: 'jumpToFrame', idx: rowIdx}}, '*');
+                    }}, 1000);
+                }} else {{
+                    alert('Popup blocked. Please allow popups for this site.');
+                }}
             }}
         }}
 

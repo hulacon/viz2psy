@@ -548,7 +548,12 @@ def main():
         "--save-frames",
         type=Path,
         default=None,
-        help="Save extracted video frames to this directory.",
+        help="Save extracted video frames to this directory. Default: auto (derives from output path).",
+    )
+    parser.add_argument(
+        "--no-save-frames",
+        action="store_true",
+        help="Do not save video frames to disk. Frames will be extracted on-the-fly for visualization.",
     )
     # HDF5-specific options
     parser.add_argument(
@@ -666,11 +671,23 @@ def main():
             if args.start != 0 or args.end is not None:
                 print("Warning: --start/--end are only used with HDF5 input.", file=sys.stderr)
 
+            # Determine save_frames directory
+            # Default: save frames alongside output (unless --no-save-frames)
+            save_frames_dir = args.save_frames
+            if save_frames_dir is None and not args.no_save_frames:
+                # Auto-derive from output path
+                if args.output:
+                    # e.g., output.csv -> output_frames/
+                    save_frames_dir = args.output.parent / (args.output.stem + "_frames")
+                else:
+                    # e.g., video.mp4 -> video_frames/
+                    save_frames_dir = inputs[0].parent / (inputs[0].stem + "_frames")
+
             result_df = _process_video(
                 video_path=inputs[0],
                 models=models,
                 frame_interval=args.frame_interval,
-                save_frames=args.save_frames,
+                save_frames=save_frames_dir,
                 batch_size=args.batch_size,
                 device=args.device,
                 quiet=args.quiet,
@@ -678,8 +695,8 @@ def main():
             )
         else:
             # Image processing
-            if args.save_frames:
-                print("Warning: --save-frames is only used with video input.", file=sys.stderr)
+            if args.save_frames or args.no_save_frames:
+                print("Warning: --save-frames/--no-save-frames are only used with video input.", file=sys.stderr)
             if args.frame_interval != 0.5:
                 print("Warning: --frame-interval is only used with video input.", file=sys.stderr)
             if args.dataset:

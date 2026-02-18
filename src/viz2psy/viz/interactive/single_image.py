@@ -578,14 +578,18 @@ def create_single_image_viewer(
     configure_theme()
 
     # Handle different image input types
-    if isinstance(image, PILImage.Image):
+    if image is None:
+        pil_image = None
+        image_path = None
+        title_name = image_title or f"Row {row_idx}"
+    elif isinstance(image, PILImage.Image):
         pil_image = image
         image_path = None
         title_name = image_title or f"Row {row_idx}"
     else:
         image_path = Path(image)
         pil_image = None
-        title_name = image_path.name
+        title_name = image_title or image_path.name
 
     row = scores_df.iloc[row_idx]
 
@@ -605,8 +609,8 @@ def create_single_image_viewer(
             panels.append("yolo")
         if "places" in available:
             panels.append("places")
-        if "clip" in available:
-            panels.append("wordcloud")
+        # Note: wordcloud disabled by default (slow CLIP text encoding)
+        # Can be explicitly requested via panels=["wordcloud", ...]
 
     if not panels:
         panels = ["scalars"]  # Fallback
@@ -1363,8 +1367,8 @@ def create_browsable_viewer(
             panels.append("yolo")
         if "places" in available:
             panels.append("places")
-        if "clip" in available:
-            panels.append("wordcloud")
+        # Note: wordcloud disabled by default (slow CLIP text encoding)
+        # Can be explicitly requested via panels=["wordcloud", ...]
 
     if not panels:
         panels = ["scalars"]  # Fallback
@@ -1374,10 +1378,12 @@ def create_browsable_viewer(
     frames_data = []
 
     for idx in range(n_rows):
+        if idx % 50 == 0:
+            print(f"  Processing frame {idx}/{n_rows}...")
         row = scores_df.iloc[idx]
 
         # Get image
-        image = image_resolver.resolve(scores_df, idx)
+        image = image_resolver.resolve(scores_df, idx) if image_resolver else None
         img_b64 = None
         img_aspect = 1.0  # Default aspect ratio (width/height)
 
@@ -1406,7 +1412,8 @@ def create_browsable_viewer(
             )
 
         # Generate label for slider
-        label = _get_row_label(row, idx, image_resolver.detected_input_type)
+        input_type = image_resolver.detected_input_type if image_resolver else None
+        label = _get_row_label(row, idx, input_type)
 
         frames_data.append({
             "idx": idx,
@@ -1441,7 +1448,7 @@ def create_browsable_viewer(
             trace = _create_panel_trace(panel_type, feature, visible=None)  # Keep current visibility
             trace_updates.append(trace)
 
-        # Build layout update with image
+        # Build layout update with image or placeholder
         layout_update = {}
         if frame_data["img_b64"]:
             layout_update["images"] = [dict(
@@ -1457,6 +1464,19 @@ def create_browsable_viewer(
                 layer="below",
                 sizing="contain",
             )]
+            layout_update["annotations"] = []  # Clear placeholder
+        else:
+            layout_update["images"] = []  # Clear any previous image
+            layout_update["annotations"] = [dict(
+                text="Image not available<br><br><i>Use --save-frames during<br>inference to enable viewing</i>",
+                xref="paper",
+                yref="paper",
+                x=0.215,  # Center of left panel (0.43/2)
+                y=0.575,  # Center vertically (1 - 0.85/2)
+                showarrow=False,
+                font=dict(size=14, color="gray"),
+                align="center",
+            )]
         layout_update["title"] = {"text": frame_data["label"]}
 
         frames.append(go.Frame(
@@ -1467,7 +1487,7 @@ def create_browsable_viewer(
 
     fig.frames = frames
 
-    # Add initial image
+    # Add initial image or placeholder
     if first_frame["img_b64"]:
         fig.add_layout_image(dict(
             source=f"data:image/png;base64,{first_frame['img_b64']}",
@@ -1481,6 +1501,17 @@ def create_browsable_viewer(
             yanchor="top",
             layer="below",
             sizing="contain",
+        ))
+    else:
+        fig.add_annotation(dict(
+            text="Image not available<br><br><i>Use --save-frames during<br>inference to enable viewing</i>",
+            xref="paper",
+            yref="paper",
+            x=0.215,  # Center of left panel
+            y=0.575,  # Center vertically
+            showarrow=False,
+            font=dict(size=14, color="gray"),
+            align="center",
         ))
 
     # Create slider
@@ -1586,11 +1617,13 @@ def _create_panel_trace(panel_type: str, feature_data: dict, visible: bool | Non
             customdata=feature_data.get("hover_texts", []),
         )
     elif panel_type == "saliency":
-        img_array = feature_data.get("image_array")
-        if img_array is not None:
-            trace = go.Image(
-                z=img_array,
-                hoverinfo="skip",
+        grid = feature_data.get("grid")
+        if grid is not None:
+            trace = go.Heatmap(
+                z=grid,
+                colorscale="Hot",
+                hovertemplate="Row: %{y}, Col: %{x}<br>Saliency: %{z:.3f}<extra></extra>",
+                showscale=False,
             )
         else:
             # Fallback to empty
@@ -1643,9 +1676,9 @@ def _apply_panel_axis_config(fig: go.Figure, panel_type: str, img_aspect: float 
         fig.update_yaxes(autorange=True, type="linear", visible=True, scaleanchor=None)
         fig.update_xaxes(type="category", visible=True, scaleanchor=None, constrain=None)
     elif panel_type == "saliency":
-        # Saliency is rendered as go.Image with fixed height=300
-        fig.update_yaxes(range=[300, 0], autorange=False, visible=False, scaleanchor=None)
-        fig.update_xaxes(autorange=True, visible=False, scaleanchor=None)
+        # Saliency is rendered as go.Heatmap
+        fig.update_yaxes(autorange="reversed", visible=False, scaleanchor="x", scaleratio=1)
+        fig.update_xaxes(visible=False, constrain="domain")
     elif panel_type == "wordcloud":
         fig.update_yaxes(autorange="reversed", visible=False, scaleanchor="x", scaleratio=1.0)
         fig.update_xaxes(visible=False, constrain="domain")
@@ -1694,19 +1727,19 @@ def _get_panel_axis_updates(panel_type: str, img_aspect: float = 1.0) -> dict:
             },
         }
     elif panel_type == "saliency":
-        # Saliency is rendered as go.Image with fixed height=300
+        # Saliency is rendered as go.Heatmap
         return {
             "yaxis": {
-                "range": [300, 0],  # Fixed height, reversed for image display
+                "autorange": "reversed",  # Flip so origin is top-left
                 "visible": False,
-                "scaleanchor": None,
+                "scaleanchor": "x",  # Square cells
+                "scaleratio": 1.0,
                 "domain": base_y_domain,
-                "autorange": False,
             },
             "xaxis": {
                 "autorange": True,
                 "visible": False,
-                "scaleanchor": None,
+                "constrain": "domain",
                 "domain": base_x_domain,
             },
         }
@@ -1788,17 +1821,10 @@ def _extract_panel_data(
         # gives us grid[x][y]. Transpose to get grid[y][x] for correct display.
         grid = grid.T
 
-        # Render as image with correct aspect ratio
-        # Use fixed height so y-axis range is consistent across frames
-        fixed_height = 300
-        target_height = fixed_height
-        target_width = int(fixed_height * img_aspect)
-
-        img_array = _render_saliency_to_image(grid, target_width, target_height)
+        # Store raw grid for go.Heatmap (much faster than matplotlib rendering)
         data = {
-            "image_array": img_array.tolist(),
-            "width": target_width,
-            "height": target_height,
+            "grid": grid.tolist(),
+            "grid_size": side,
         }
 
     elif panel_type == "yolo" and "yolo" in available:
