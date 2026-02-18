@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 from tqdm import tqdm
 
+from .exceptions import InferenceError, ModelLoadError
 from .models.base import BaseModel
 from .utils import load_image
 
@@ -37,7 +38,10 @@ def score_images(
 
     if not quiet:
         print(f"Loading {model.name} model on {model.device} ...")
-    model.load()
+    try:
+        model.load()
+    except Exception as e:
+        raise ModelLoadError(model.name, str(e)) from e
 
     all_rows: list[dict] = []
     iterator = range(0, len(image_paths), batch_size)
@@ -47,7 +51,10 @@ def score_images(
     for batch_start in iterator:
         batch_paths = image_paths[batch_start : batch_start + batch_size]
         images = [load_image(p) for p in batch_paths]
-        scores_list = model.predict_batch(images)
+        try:
+            scores_list = model.predict_batch(images)
+        except Exception as e:
+            raise InferenceError(model.name, str(e)) from e
 
         for path, scores in zip(batch_paths, scores_list):
             row = {"filename": path.name}

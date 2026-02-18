@@ -8,6 +8,8 @@ import psutil
 from PIL import Image
 from tqdm import tqdm
 
+from .exceptions import VideoError
+
 # Common video file extensions
 VIDEO_EXTENSIONS = {".mp4", ".avi", ".mov", ".mkv", ".webm", ".flv", ".wmv", ".m4v"}
 
@@ -25,9 +27,17 @@ def get_video_info(video_path: Path) -> dict:
     dict
         Keys: fps, frame_count, duration, width, height
     """
+    video_path = Path(video_path)
+    if not video_path.exists():
+        raise VideoError(video_path, "file not found")
+
     cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        raise VideoError(video_path, "could not open video file")
     try:
         fps = cap.get(cv2.CAP_PROP_FPS)
+        if fps <= 0:
+            raise VideoError(video_path, "could not determine video frame rate")
         frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -85,10 +95,17 @@ def extract_frames(
         Each entry is (timestamp_in_seconds, PIL.Image or Path).
     """
     video_path = Path(video_path)
+    if not video_path.exists():
+        raise VideoError(video_path, "file not found")
+
     cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        raise VideoError(video_path, "could not open video file")
 
     try:
         fps = cap.get(cv2.CAP_PROP_FPS)
+        if fps <= 0:
+            raise VideoError(video_path, "could not determine video frame rate")
         frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         duration = frame_count / fps if fps > 0 else 0
 

@@ -6,6 +6,8 @@ from pathlib import Path
 import torch
 from PIL import Image
 
+from viz2psy.exceptions import DeviceError
+
 
 def _get_default_device() -> torch.device:
     """Auto-detect the best available device."""
@@ -21,7 +23,14 @@ class BaseModel(ABC):
 
     def __init__(self, device: str | None = None):
         if device:
-            self.device = torch.device(device)
+            try:
+                self.device = torch.device(device)
+            except RuntimeError as e:
+                raise DeviceError(device, str(e)) from e
+            if self.device.type == "cuda" and not torch.cuda.is_available():
+                raise DeviceError(device, "CUDA is not available on this system")
+            if self.device.type == "mps" and not torch.backends.mps.is_available():
+                raise DeviceError(device, "MPS is not available on this system")
         else:
             self.device = _get_default_device()
         self.model = None

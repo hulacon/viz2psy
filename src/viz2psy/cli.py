@@ -39,6 +39,15 @@ import importlib
 import sys
 from pathlib import Path
 
+from viz2psy.exceptions import (
+    DeviceError,
+    ImageLoadError,
+    InferenceError,
+    ModelLoadError,
+    VideoError,
+    Viz2PsyError,
+)
+
 # Lazy model registry: maps name -> (module_path, class_name, description).
 MODEL_REGISTRY = {
     "resmem": ("viz2psy.models.resmem", "ResMemModel", "Image memorability (0-1)"),
@@ -155,6 +164,22 @@ def _clear_gpu_memory():
         pass
 
 
+def _cuda_available() -> bool:
+    try:
+        import torch
+        return torch.cuda.is_available()
+    except ImportError:
+        return False
+
+
+def _mps_available() -> bool:
+    try:
+        import torch
+        return torch.backends.mps.is_available()
+    except ImportError:
+        return False
+
+
 def _process_hdf5(
     hdf5_path: Path,
     dataset_name: str,
@@ -207,7 +232,10 @@ def _process_hdf5(
 
             if not quiet:
                 print(f"Loading {model.name} on {model.device}...")
-            model.load()
+            try:
+                model.load()
+            except Exception as e:
+                raise ModelLoadError(model_name, str(e)) from e
 
             # Track device for metadata
             if metadata and metadata.device is None:
@@ -239,7 +267,10 @@ def _process_hdf5(
                 batch_images = [Image.fromarray(arr, mode="RGB") for arr in batch_arrays]
 
                 # Score batch
-                results = model.predict_batch(batch_images)
+                try:
+                    results = model.predict_batch(batch_images)
+                except Exception as e:
+                    raise InferenceError(model_name, str(e)) from e
                 model_scores.extend(results)
 
             # Add to results dict
@@ -360,7 +391,10 @@ def _process_video(
 
             if not quiet:
                 print(f"Loading {model.name} model on {model.device} ...")
-            model.load()
+            try:
+                model.load()
+            except Exception as e:
+                raise ModelLoadError(model_name, str(e)) from e
 
             # Track device for metadata
             if metadata and metadata.device is None:
@@ -376,7 +410,10 @@ def _process_video(
 
             for batch_start in iterator:
                 batch = images[batch_start : batch_start + batch_size]
-                scores_list = model.predict_batch(batch)
+                try:
+                    scores_list = model.predict_batch(batch)
+                except Exception as e:
+                    raise InferenceError(model_name, str(e)) from e
                 all_scores.extend(scores_list)
 
             elapsed = time.time() - start_time
@@ -587,89 +624,118 @@ def main():
     # Initialize metadata builder (only save if output is specified)
     metadata = MetadataBuilder() if args.output else None
 
-    if len(inputs) == 1 and is_hdf5_file(inputs[0]):
-        # HDF5 processing
-        if args.save_frames:
-            print("Warning: --save-frames is only used with video input.", file=sys.stderr)
-        if args.frame_interval != 0.5:
-            print("Warning: --frame-interval is only used with video input.", file=sys.stderr)
+    try:
+        if len(inputs) == 1 and is_hdf5_file(inputs[0]):
+            # HDF5 processing
+            if args.save_frames:
+                print("Warning: --save-frames is only used with video input.", file=sys.stderr)
+            if args.frame_interval != 0.5:
+                print("Warning: --frame-interval is only used with video input.", file=sys.stderr)
 
-        hdf5_path = inputs[0]
-        if not hdf5_path.exists():
-            print(f"Error: File not found: {hdf5_path}", file=sys.stderr)
-            sys.exit(1)
+            hdf5_path = inputs[0]
+            if not hdf5_path.exists():
+                print(f"Error: File not found: {hdf5_path}", file=sys.stderr)
+                sys.exit(1)
 
-        dataset_name = _find_image_dataset(hdf5_path, args.dataset)
+            dataset_name = _find_image_dataset(hdf5_path, args.dataset)
 
-        # Default output path for HDF5
-        output_path = args.output
-        if output_path is None:
-            output_path = hdf5_path.with_name(hdf5_path.stem + "_scores.csv")
+            # Default output path for HDF5
+            output_path = args.output
+            if output_path is None:
+                output_path = hdf5_path.with_name(hdf5_path.stem + "_scores.csv")
 
-        result_df = _process_hdf5(
-            hdf5_path=hdf5_path,
-            dataset_name=dataset_name,
-            models=models,
-            output_path=output_path,
-            batch_size=args.batch_size,
-            start_idx=args.start,
-            end_idx=args.end,
-            device=args.device,
-            quiet=args.quiet,
-            metadata=metadata,
-        )
-        # Override output path for HDF5 (it has default)
-        args.output = output_path
+            result_df = _process_hdf5(
+                hdf5_path=hdf5_path,
+                dataset_name=dataset_name,
+                models=models,
+                output_path=output_path,
+                batch_size=args.batch_size,
+                start_idx=args.start,
+                end_idx=args.end,
+                device=args.device,
+                quiet=args.quiet,
+                metadata=metadata,
+            )
+            # Override output path for HDF5 (it has default)
+            args.output = output_path
 
-    elif len(inputs) == 1 and is_video_file(inputs[0]):
-        # Video processing
-        if args.dataset:
-            print("Warning: --dataset is only used with HDF5 input.", file=sys.stderr)
-        if args.start != 0 or args.end is not None:
-            print("Warning: --start/--end are only used with HDF5 input.", file=sys.stderr)
+        elif len(inputs) == 1 and is_video_file(inputs[0]):
+            # Video processing
+            if args.dataset:
+                print("Warning: --dataset is only used with HDF5 input.", file=sys.stderr)
+            if args.start != 0 or args.end is not None:
+                print("Warning: --start/--end are only used with HDF5 input.", file=sys.stderr)
 
-        result_df = _process_video(
-            video_path=inputs[0],
-            models=models,
-            frame_interval=args.frame_interval,
-            save_frames=args.save_frames,
-            batch_size=args.batch_size,
-            device=args.device,
-            quiet=args.quiet,
-            metadata=metadata,
-        )
-    else:
-        # Image processing
-        if args.save_frames:
-            print("Warning: --save-frames is only used with video input.", file=sys.stderr)
-        if args.frame_interval != 0.5:
-            print("Warning: --frame-interval is only used with video input.", file=sys.stderr)
-        if args.dataset:
-            print("Warning: --dataset is only used with HDF5 input.", file=sys.stderr)
-        if args.start != 0 or args.end is not None:
-            print("Warning: --start/--end are only used with HDF5 input.", file=sys.stderr)
+            result_df = _process_video(
+                video_path=inputs[0],
+                models=models,
+                frame_interval=args.frame_interval,
+                save_frames=args.save_frames,
+                batch_size=args.batch_size,
+                device=args.device,
+                quiet=args.quiet,
+                metadata=metadata,
+            )
+        else:
+            # Image processing
+            if args.save_frames:
+                print("Warning: --save-frames is only used with video input.", file=sys.stderr)
+            if args.frame_interval != 0.5:
+                print("Warning: --frame-interval is only used with video input.", file=sys.stderr)
+            if args.dataset:
+                print("Warning: --dataset is only used with HDF5 input.", file=sys.stderr)
+            if args.start != 0 or args.end is not None:
+                print("Warning: --start/--end are only used with HDF5 input.", file=sys.stderr)
 
-        result_df = _process_images(
-            image_paths=inputs,
-            models=models,
-            batch_size=args.batch_size,
-            device=args.device,
-            quiet=args.quiet,
-            metadata=metadata,
-        )
+            result_df = _process_images(
+                image_paths=inputs,
+                models=models,
+                batch_size=args.batch_size,
+                device=args.device,
+                quiet=args.quiet,
+                metadata=metadata,
+            )
 
-    if args.output:
-        result_df.to_csv(args.output, index=False)
+        if args.output:
+            result_df.to_csv(args.output, index=False)
 
-        # Save metadata sidecar
-        metadata.set_output(args.output, len(result_df), len(result_df.columns))
-        meta_path = metadata.save(args.output)
+            # Save metadata sidecar
+            metadata.set_output(args.output, len(result_df), len(result_df.columns))
+            meta_path = metadata.save(args.output)
 
-        if not args.quiet:
-            print(f"Saved {len(result_df)} rows to {args.output}")
-            print(f"Metadata saved to {meta_path}")
-    else:
-        print(result_df.to_string(index=False))
+            if not args.quiet:
+                print(f"Saved {len(result_df)} rows to {args.output}")
+                print(f"Metadata saved to {meta_path}")
+        else:
+            print(result_df.to_string(index=False))
+
+    except DeviceError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        print(f"Available devices: cpu"
+              + (", cuda" if _cuda_available() else "")
+              + (", mps" if _mps_available() else ""),
+              file=sys.stderr)
+        sys.exit(1)
+    except ImageLoadError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    except VideoError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    except ModelLoadError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        print("Check your internet connection and available disk space.", file=sys.stderr)
+        sys.exit(1)
+    except InferenceError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        print("Try reducing --batch-size or using --device cpu.", file=sys.stderr)
+        sys.exit(1)
+    except KeyboardInterrupt:
+        print("\nInterrupted.", file=sys.stderr)
+        sys.exit(130)
+    except OSError as e:
+        print(f"Error writing output: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
