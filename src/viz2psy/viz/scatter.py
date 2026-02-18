@@ -5,9 +5,8 @@ import fnmatch
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE
-from sklearn.preprocessing import StandardScaler
+
+from .projection import compute_projection, PROJECTION_METHODS
 
 
 def get_feature_columns(
@@ -52,7 +51,7 @@ def plot_scatter(
         Features to project. Supports glob patterns (e.g., "clip_*").
         If None, uses all numeric features.
     method : str
-        Projection method: "pca", "umap", or "tsne".
+        Projection method: "pca", "umap", "tsne", "mds", or "mds_nonmetric".
     color_by : str, optional
         Column to use for coloring points.
     figsize : tuple
@@ -74,42 +73,12 @@ def plot_scatter(
         raise ValueError("Need at least 2 features for projection.")
 
     # Extract feature matrix
-    X = df[feature_cols].values
+    X = df[feature_cols].values.copy()
 
-    # Handle NaN values
-    if np.any(np.isnan(X)):
-        print("Warning: NaN values found, filling with column means.")
-        X = np.nan_to_num(X, nan=np.nanmean(X, axis=0))
-
-    # Standardize features
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
-
-    # Project to 2D
-    if method == "pca":
-        projector = PCA(n_components=2, random_state=42)
-        X_2d = projector.fit_transform(X_scaled)
-        var_explained = projector.explained_variance_ratio_
-        xlabel = f"PC1 ({var_explained[0]:.1%} var)"
-        ylabel = f"PC2 ({var_explained[1]:.1%} var)"
-    elif method == "umap":
-        try:
-            import umap
-        except ImportError:
-            raise ImportError("umap-learn is required for UMAP projection. Install with: pip install umap-learn")
-        projector = umap.UMAP(n_components=2, random_state=42)
-        X_2d = projector.fit_transform(X_scaled)
-        xlabel = "UMAP1"
-        ylabel = "UMAP2"
-    elif method == "tsne":
-        # Adjust perplexity for small datasets
-        perplexity = min(30, len(X) - 1)
-        projector = TSNE(n_components=2, random_state=42, perplexity=perplexity)
-        X_2d = projector.fit_transform(X_scaled)
-        xlabel = "t-SNE1"
-        ylabel = "t-SNE2"
-    else:
-        raise ValueError(f"Unknown method: {method}. Use 'pca', 'umap', or 'tsne'.")
+    # Project to 2D using unified projection module
+    X_2d, info = compute_projection(X, method=method, n_components=2)
+    xlabel = info["xlabel"]
+    ylabel = info["ylabel"]
 
     # Create figure
     fig, ax = plt.subplots(figsize=figsize)

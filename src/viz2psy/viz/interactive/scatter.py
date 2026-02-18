@@ -1,7 +1,7 @@
 """Interactive scatter plot with dimensionality reduction using Plotly.
 
 Provides interactive 2D scatter plots with:
-- Multiple DR methods (PCA, UMAP, t-SNE)
+- Multiple DR methods (PCA, UMAP, t-SNE, MDS)
 - Point selection and highlighting
 - Hover tooltips with feature values
 - Automatic sampling for large datasets
@@ -19,10 +19,9 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
 
 from .base import configure_theme
+from ..projection import compute_projection, PROJECTION_METHODS
 
 if TYPE_CHECKING:
     from ..sidecar import SidecarMetadata
@@ -50,62 +49,6 @@ def get_feature_columns(
     return sorted([c for c in matched if c not in exclude])
 
 
-def _compute_projection(
-    X: np.ndarray,
-    method: str = "pca",
-) -> tuple[np.ndarray, dict]:
-    """Compute 2D projection of feature matrix.
-
-    Returns
-    -------
-    X_2d : np.ndarray
-        2D coordinates (n_samples, 2).
-    info : dict
-        Additional info (axis labels, etc.).
-    """
-    # Handle NaN values
-    if np.any(np.isnan(X)):
-        col_means = np.nanmean(X, axis=0)
-        for i in range(X.shape[1]):
-            mask = np.isnan(X[:, i])
-            X[mask, i] = col_means[i]
-
-    # Standardize
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
-
-    if method == "pca":
-        projector = PCA(n_components=2, random_state=42)
-        X_2d = projector.fit_transform(X_scaled)
-        var_explained = projector.explained_variance_ratio_
-        info = {
-            "xlabel": f"PC1 ({var_explained[0]:.1%} var)",
-            "ylabel": f"PC2 ({var_explained[1]:.1%} var)",
-        }
-    elif method == "umap":
-        try:
-            import umap
-        except ImportError:
-            raise ImportError(
-                "umap-learn is required for UMAP projection. "
-                "Install with: pip install umap-learn"
-            )
-        projector = umap.UMAP(n_components=2, random_state=42)
-        X_2d = projector.fit_transform(X_scaled)
-        info = {"xlabel": "UMAP1", "ylabel": "UMAP2"}
-    elif method == "tsne":
-        from sklearn.manifold import TSNE
-
-        perplexity = min(30, len(X) - 1)
-        projector = TSNE(n_components=2, random_state=42, perplexity=perplexity)
-        X_2d = projector.fit_transform(X_scaled)
-        info = {"xlabel": "t-SNE1", "ylabel": "t-SNE2"}
-    else:
-        raise ValueError(f"Unknown method: {method}. Use 'pca', 'umap', or 'tsne'.")
-
-    return X_2d, info
-
-
 def plot_scatter_interactive(
     df: pd.DataFrame,
     features: list[str] | None = None,
@@ -128,7 +71,7 @@ def plot_scatter_interactive(
     features : list of str, optional
         Feature columns or glob patterns to project.
     method : str
-        Projection method: "pca", "umap", or "tsne".
+        Projection method: "pca", "umap", "tsne", "mds", or "mds_nonmetric".
     color_by : str, optional
         Column to use for point coloring.
     hover_data : list of str, optional
@@ -169,9 +112,9 @@ def plot_scatter_interactive(
             f"Need at least 2 features for projection, found {len(feature_cols)}."
         )
 
-    # Compute projection
-    X = df[feature_cols].values
-    X_2d, info = _compute_projection(X, method=method)
+    # Compute projection using unified module
+    X = df[feature_cols].values.copy()
+    X_2d, info = compute_projection(X, method=method, n_components=2)
 
     # Build plot DataFrame
     plot_df = pd.DataFrame({

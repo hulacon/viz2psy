@@ -18,10 +18,9 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
 
 from .base import configure_theme
+from ..projection import compute_projection, PROJECTION_METHODS
 
 if TYPE_CHECKING:
     from ..sidecar import SidecarMetadata
@@ -49,54 +48,6 @@ def get_feature_columns(
     return sorted([c for c in matched if c not in exclude])
 
 
-def _compute_projection(
-    X: np.ndarray,
-    method: str = "pca",
-) -> tuple[np.ndarray, dict]:
-    """Compute 2D projection of feature matrix."""
-    # Handle NaN values
-    if np.any(np.isnan(X)):
-        col_means = np.nanmean(X, axis=0)
-        for i in range(X.shape[1]):
-            mask = np.isnan(X[:, i])
-            X[mask, i] = col_means[i]
-
-    # Standardize
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
-
-    if method == "pca":
-        projector = PCA(n_components=2, random_state=42)
-        X_2d = projector.fit_transform(X_scaled)
-        var_explained = projector.explained_variance_ratio_
-        info = {
-            "xlabel": f"PC1 ({var_explained[0]:.1%} var)",
-            "ylabel": f"PC2 ({var_explained[1]:.1%} var)",
-        }
-    elif method == "umap":
-        try:
-            import umap
-        except ImportError:
-            raise ImportError(
-                "umap-learn is required for UMAP projection. "
-                "Install with: pip install umap-learn"
-            )
-        projector = umap.UMAP(n_components=2, random_state=42)
-        X_2d = projector.fit_transform(X_scaled)
-        info = {"xlabel": "UMAP1", "ylabel": "UMAP2"}
-    elif method == "tsne":
-        from sklearn.manifold import TSNE
-
-        perplexity = min(30, len(X) - 1)
-        projector = TSNE(n_components=2, random_state=42, perplexity=perplexity)
-        X_2d = projector.fit_transform(X_scaled)
-        info = {"xlabel": "t-SNE1", "ylabel": "t-SNE2"}
-    else:
-        raise ValueError(f"Unknown method: {method}. Use 'pca', 'umap', or 'tsne'.")
-
-    return X_2d, info
-
-
 def create_linked_explorer(
     df: pd.DataFrame,
     scatter_features: list[str],
@@ -122,7 +73,7 @@ def create_linked_explorer(
         Features to show in timeseries. If None, uses color_by or
         first scalar features found.
     method : str
-        Projection method: "pca", "umap", or "tsne".
+        Projection method: "pca", "umap", "tsne", "mds", or "mds_nonmetric".
     time_col : str
         Time column name for timeseries.
     color_by : str, optional
@@ -161,13 +112,13 @@ def create_linked_explorer(
         else:
             df = df.sample(n=max_points, random_state=42).reset_index(drop=True)
 
-    # Compute scatter projection
+    # Compute scatter projection using unified module
     scatter_cols = get_feature_columns(df, scatter_features)
     if len(scatter_cols) < 2:
         raise ValueError(f"Need at least 2 scatter features, found {len(scatter_cols)}.")
 
-    X = df[scatter_cols].values
-    X_2d, proj_info = _compute_projection(X, method=method)
+    X = df[scatter_cols].values.copy()
+    X_2d, proj_info = compute_projection(X, method=method, n_components=2)
 
     # Determine timeseries features
     if timeseries_features is None:

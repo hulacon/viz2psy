@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Dashboard** (`viz2psy-viz dashboard`)
+  - Interactive model-visualization dashboard for multi-image datasets
+  - Model selection dropdown (auto-detects available models)
+  - Visualization type buttons: time series, MDS clustering, state-space trajectories
+  - 2D/3D toggle for clustering visualizations
+  - Static/animated toggle for trajectory visualizations
+  - Click-to-view: clicking any data point opens full single-image viewer in new tab
+  - Automatic feature-to-visualization compatibility detection
+
+- **Projection methods**
+  - `ppca`: Probabilistic PCA via EM algorithm (handles missing data natively)
+  - `mds`: Metric Multi-Dimensional Scaling
+  - `mds_nonmetric`: Non-metric MDS
+
 - Interactive visualizations (Plotly-based)
   - Single-image viewer with dropdown panel selection
   - Browsable viewer with slider for multiple images/frames

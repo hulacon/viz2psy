@@ -1,10 +1,19 @@
 """Time series visualization for video scores."""
 
+from __future__ import annotations
+
 import fnmatch
+import warnings
+from typing import TYPE_CHECKING
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+
+from .index_utils import detect_index_column, prepare_index_values, is_video_data
+
+if TYPE_CHECKING:
+    from .sidecar import SidecarMetadata
 
 
 def get_feature_columns(
@@ -27,7 +36,7 @@ def get_feature_columns(
     -------
     list of str
     """
-    exclude = exclude or ["time", "index", "filename", "filepath"]
+    exclude = exclude or ["time", "index", "filename", "filepath", "image_idx"]
 
     if patterns is None:
         # All numeric columns except excluded
@@ -48,32 +57,77 @@ def get_feature_columns(
 def plot_timeseries(
     df: pd.DataFrame,
     features: list[str] | None = None,
-    time_col: str = "time",
+    index_col: str | None = None,
     figsize: tuple[int, int] | None = None,
     title: str | None = None,
+    show_diff: bool = False,
+    rolling_window: int | None = None,
+    auto_video_mode: bool = True,
+    sidecar: "SidecarMetadata | None" = None,
 ) -> plt.Figure:
-    """Plot feature values over time.
+    """Plot feature values over time/index.
 
     Parameters
     ----------
     df : pd.DataFrame
-        DataFrame with a time column and feature columns.
+        DataFrame with an index column and feature columns.
     features : list of str, optional
         Features to plot. Supports glob patterns (e.g., "clip_*").
         If None, plots all scalar features (not high-dim embeddings).
-    time_col : str
-        Name of the time column (default: "time").
+    index_col : str, optional
+        Name of the index column. If None, auto-detects from sidecar
+        or DataFrame (time, filename, image_idx).
     figsize : tuple, optional
         Figure size (width, height) in inches.
     title : str, optional
         Plot title.
+    show_diff : bool
+        If True, plot first-order differences between consecutive points.
+        Auto-enabled for video data if auto_video_mode=True.
+    rolling_window : int, optional
+        If provided, overlay rolling average with this window size.
+        Auto-enabled (window=5) for video data if auto_video_mode=True.
+    auto_video_mode : bool
+        If True and data appears to be from video, auto-enable show_diff
+        and rolling_window=5 unless explicitly disabled.
+    sidecar : SidecarMetadata, optional
+        Sidecar metadata for index detection.
 
     Returns
     -------
     matplotlib.figure.Figure
     """
-    if time_col not in df.columns:
-        raise ValueError(f"Time column '{time_col}' not found in DataFrame.")
+    # Auto-detect index column
+    detected_col, index_type = detect_index_column(df, sidecar)
+    if index_col is None:
+        index_col = detected_col
+
+    if index_col is None:
+        # Fall back to row numbers
+        index_col = "_row_index"
+        df = df.copy()
+        df[index_col] = np.arange(len(df))
+        index_type = "integer"
+
+    if index_col not in df.columns and index_col != "_row_index":
+        raise ValueError(f"Index column '{index_col}' not found in DataFrame.")
+
+    # Auto-enable video mode features
+    if auto_video_mode and is_video_data(df, sidecar):
+        if not show_diff:
+            show_diff = True
+        if rolling_window is None:
+            rolling_window = 5
+
+    # Validate rolling window
+    if rolling_window is not None:
+        if rolling_window >= len(df):
+            new_window = max(1, len(df) // 3)
+            warnings.warn(
+                f"rolling_window ({rolling_window}) >= data length ({len(df)}), "
+                f"reducing to {new_window}."
+            )
+            rolling_window = new_window
 
     # Get feature columns
     feature_cols = get_feature_columns(df, features)
@@ -89,6 +143,9 @@ def plot_timeseries(
 
     if not feature_cols:
         raise ValueError("No features found to plot.")
+
+    # Prepare index values and formatting
+    x_values, format_info = prepare_index_values(df, index_col, index_type)
 
     # Determine layout
     n_features = len(feature_cols)
@@ -107,16 +164,39 @@ def plot_timeseries(
     fig, axes = plt.subplots(nrows, ncols, figsize=figsize, squeeze=False)
     axes = axes.flatten()
 
-    time = df[time_col].values
-
     for i, col in enumerate(feature_cols):
         ax = axes[i]
         values = df[col].values
-        ax.plot(time, values, linewidth=1)
-        ax.set_xlabel("Time (s)")
+
+        # Plot main line
+        ax.plot(x_values, values, linewidth=1, label=col, alpha=0.8)
+
+        # Plot differences if requested
+        if show_diff:
+            diff_values = np.diff(values)
+            diff_x = x_values[1:]
+            ax.plot(diff_x, diff_values, linewidth=0.8, label=f"{col} (diff)",
+                    alpha=0.6, linestyle="--")
+
+        # Plot rolling average if requested
+        if rolling_window is not None:
+            rolling_avg = pd.Series(values).rolling(window=rolling_window, center=True).mean()
+            ax.plot(x_values, rolling_avg, linewidth=1.5, label=f"rolling ({rolling_window})",
+                    alpha=0.9, color="red")
+
+        ax.set_xlabel(format_info["xlabel"])
         ax.set_ylabel(col)
         ax.set_title(col)
         ax.grid(True, alpha=0.3)
+
+        # Handle ordinal x-axis labels
+        if index_type == "ordinal" and "tickvals" in format_info:
+            ax.set_xticks(format_info["tickvals"])
+            ax.set_xticklabels(format_info["ticktext"], rotation=45, ha="right")
+
+        # Show legend if multiple lines
+        if show_diff or rolling_window is not None:
+            ax.legend(fontsize=8, loc="upper right")
 
     # Hide unused axes
     for i in range(n_features, len(axes)):

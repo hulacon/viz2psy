@@ -12,11 +12,17 @@ Examples
     # Interactive timeseries with zoom/pan
     viz2psy-viz timeseries scores.csv --features memorability -i -o plot.html
 
+    # Timeseries with diff and rolling average (auto for video)
+    viz2psy-viz timeseries scores.csv --show-diff --rolling-window 10 -o plot.png
+
     # Correlation heatmap
     viz2psy-viz heatmap scores.csv -o heatmap.png
 
     # 2D scatter projection of embeddings
     viz2psy-viz scatter scores.csv --features "clip_*" -o scatter.png
+
+    # MDS scatter projection
+    viz2psy-viz scatter scores.csv --features "clip_*" --method mds -o mds.png
 
     # Interactive scatter with image thumbnails
     viz2psy-viz scatter scores.csv --features "clip_*" -i --show-images -o scatter.html
@@ -35,6 +41,12 @@ Examples
 
     # Single-image viewer with custom image root directory
     viz2psy-viz image scores.csv --image-root /data/stimuli --row-idx 5 -o viewer.html
+
+    # HyperTools 3D visualization
+    viz2psy-viz hyperplot scores.csv --dims 3 --n-clusters 5 -o hyper.html
+
+    # HyperTools trajectory animation
+    viz2psy-viz hyperplot scores.csv --animate --features "clip_*"
 """
 
 import argparse
@@ -42,6 +54,8 @@ import sys
 from pathlib import Path
 
 import pandas as pd
+
+from .projection import PROJECTION_METHODS
 
 
 def cmd_wordcloud(args):
@@ -77,8 +91,11 @@ def cmd_timeseries(args):
         fig = plot_timeseries_interactive(
             df,
             features=args.features,
-            time_col=args.time_col,
+            time_col=args.index_col,
             normalize=args.normalize,
+            show_diff=args.show_diff,
+            rolling_window=args.rolling_window,
+            auto_video_mode=not args.no_auto_video,
             sidecar=sidecar,
         )
 
@@ -93,11 +110,18 @@ def cmd_timeseries(args):
         print(f"Saved to {output_path}")
     else:
         from .timeseries import plot_timeseries
+        from .sidecar import load_sidecar
+
+        sidecar = load_sidecar(args.input)
 
         fig = plot_timeseries(
             df,
             features=args.features,
-            time_col=args.time_col,
+            index_col=args.index_col,
+            show_diff=args.show_diff,
+            rolling_window=args.rolling_window,
+            auto_video_mode=not args.no_auto_video,
+            sidecar=sidecar,
         )
 
         if args.output:
@@ -350,6 +374,219 @@ def cmd_image(args):
     print(f"Saved to {output_path}")
 
 
+def cmd_hyperplot(args):
+    """Create HyperTools visualization."""
+    from .hyperplot import plot_hypertools, save_hypertools_figure
+    from .sidecar import load_sidecar
+
+    df = pd.read_csv(args.input)
+    sidecar = load_sidecar(args.input)
+
+    fig = plot_hypertools(
+        df,
+        features=args.features,
+        ndims=args.dims,
+        reduce=args.method,
+        n_clusters=args.n_clusters,
+        group=args.group,
+        animate=args.animate,
+        sidecar=sidecar,
+    )
+
+    if args.output:
+        save_hypertools_figure(fig, str(args.output))
+        print(f"Saved to {args.output}")
+    else:
+        import matplotlib.pyplot as plt
+        plt.show()
+
+
+def cmd_dashboard(args):
+    """Create interactive model-visualization dashboard."""
+    from .dashboard import create_dashboard
+    from .sidecar import load_sidecar, UnifiedImageResolver
+
+    df = pd.read_csv(args.input)
+    sidecar = load_sidecar(args.input)
+
+    print(f"Creating dashboard for {args.input}...")
+    print(f"Rows: {len(df):,}, Columns: {len(df.columns)}")
+
+    # Create image resolver if images are available
+    image_resolver = None
+    if not args.no_images:
+        try:
+            image_resolver = UnifiedImageResolver(
+                csv_path=args.input,
+                sidecar=sidecar,
+                image_root=Path(args.image_root) if args.image_root else None,
+                video_path=Path(args.video_path) if args.video_path else None,
+                hdf5_path=Path(args.hdf5_path) if args.hdf5_path else None,
+            )
+            print(f"Image resolver: {image_resolver.input_type or 'auto-detect'}")
+        except Exception as e:
+            print(f"Note: Could not set up image resolver: {e}")
+
+    html = create_dashboard(
+        df,
+        sidecar=sidecar,
+        image_resolver=image_resolver,
+        width=args.width,
+        height=args.height,
+        max_thumbnails=args.max_thumbnails,
+    )
+
+    # Determine output path
+    if args.output:
+        output_path = args.output
+    else:
+        output_path = _default_output_path(args.input, "dashboard")
+        print(f"(Tip: use -o to specify output path)")
+
+    with open(output_path, "w") as f:
+        f.write(html)
+
+    print(f"Saved to {output_path}")
+
+    if args.open:
+        import webbrowser
+        webbrowser.open(f"file://{output_path.absolute()}")
+
+
+def cmd_recommend(args):
+    """Analyze CSV and recommend visualizations."""
+    from .feature_config import (
+        get_visualization_recommendations,
+        VISUALIZATION_MATRIX,
+        FEATURE_CONFIGS,
+    )
+
+    df = pd.read_csv(args.input)
+    columns = df.columns.tolist()
+
+    recommendations = get_visualization_recommendations(columns)
+
+    print(f"Analyzing: {args.input}")
+    print(f"Rows: {len(df):,}, Columns: {len(columns)}")
+    print()
+
+    # Detected models
+    models = recommendations["detected_models"]
+    if models:
+        print(f"Detected models: {', '.join(models)}")
+    else:
+        print("No viz2psy models detected in columns.")
+    print()
+
+    # Timeseries recommendations
+    ts = recommendations["timeseries"]
+    print("=" * 60)
+    print("TIMESERIES")
+    print("=" * 60)
+    if ts["available"]:
+        print(f"Recommended features ({len(ts['features'])}):")
+        # Group by model for cleaner output
+        for model in models:
+            config = FEATURE_CONFIGS.get(model)
+            if config and config.timeseries:
+                model_feats = [f for f in ts["features"] if any(
+                    __import__("fnmatch").fnmatch(f, p) for p in config.column_patterns
+                )]
+                if model_feats:
+                    mode = config.timeseries_mode
+                    if mode == "top_k":
+                        print(f"  {model} (top-{config.top_k}): {', '.join(model_feats[:5])}...")
+                    elif mode == "aggregate":
+                        print(f"  {model} (aggregate): spatial attention patterns")
+                    else:
+                        print(f"  {model}: {', '.join(model_feats[:5])}" +
+                              ("..." if len(model_feats) > 5 else ""))
+        print()
+        print("Example command:")
+        example_feats = ts["features"][:3]
+        print(f"  viz2psy-viz timeseries {args.input} --features {' '.join(example_feats)} -i")
+    else:
+        print("No features suitable for timeseries visualization.")
+    print()
+
+    # MDS/Clustering recommendations
+    mds = recommendations["mds_clustering"]
+    print("=" * 60)
+    print("MDS / CLUSTERING")
+    print("=" * 60)
+    if mds["available"]:
+        print("Available feature groups:")
+        for model, cols in mds["groups"].items():
+            config = FEATURE_CONFIGS.get(model)
+            desc = config.description if config else ""
+            print(f"  {model}: {len(cols)} dims - {desc}")
+        print()
+        print("Example commands:")
+        for model in list(mds["groups"].keys())[:2]:
+            # Use correct pattern based on model type
+            if model in ["clip", "gist", "dinov2", "saliency", "places"]:
+                pattern = f'"{model}_*"'
+            elif model == "emonet":
+                pattern = "Adoration Amusement Excitement Fear Joy"
+            elif model == "llstat":
+                pattern = '"luminance_*" rms_contrast colorfulness edge_density'
+            elif model == "yolo":
+                pattern = '"yolo_*"'
+            else:
+                pattern = f'"{model}_*"'
+            print(f"  viz2psy-viz scatter {args.input} --features {pattern} --method mds -i")
+    else:
+        print("No features suitable for MDS/clustering visualization.")
+    print()
+
+    # Trajectory recommendations
+    traj = recommendations["trajectories"]
+    print("=" * 60)
+    print("TRAJECTORIES (HyperTools)")
+    print("=" * 60)
+    if traj["available"]:
+        # Check if data is sequential
+        has_time = "time" in columns
+        has_index = any(c in columns for c in ["image_idx", "frame", "index"])
+        is_sequential = has_time or has_index
+
+        if is_sequential:
+            print("Data appears sequential (has time/index column).")
+        else:
+            print("Warning: No time/index column detected. Trajectories connect points in row order.")
+        print()
+        print("Available feature groups:")
+        for model, cols in traj["groups"].items():
+            config = FEATURE_CONFIGS.get(model)
+            desc = config.description if config else ""
+            print(f"  {model}: {len(cols)} dims - {desc}")
+        print()
+        print("Example commands:")
+        for model in list(traj["groups"].keys())[:2]:
+            # Use correct pattern based on model type
+            if model in ["clip", "gist", "dinov2", "saliency", "places"]:
+                pattern = f'"{model}_*"'
+            elif model == "emonet":
+                pattern = "Adoration Amusement Excitement Fear Joy Sadness"
+            elif model == "llstat":
+                pattern = '"luminance_*" rms_contrast colorfulness'
+            elif model == "yolo":
+                pattern = '"yolo_*"'
+            else:
+                pattern = f'"{model}_*"'
+            print(f"  viz2psy-viz hyperplot {args.input} --features {pattern} --animate --dims 3")
+    else:
+        print("No features suitable for trajectory visualization.")
+    print()
+
+    # Show matrix if requested
+    if args.matrix:
+        print("=" * 60)
+        print("VISUALIZATION MATRIX (all models)")
+        print("=" * 60)
+        print(VISUALIZATION_MATRIX)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Visualize viz2psy feature outputs.",
@@ -370,11 +607,18 @@ def main():
     p_ts.add_argument("input", type=Path, help="CSV file with scores")
     p_ts.add_argument("-o", "--output", type=Path, help="Output image path")
     p_ts.add_argument("--features", nargs="+", help="Features to plot (default: all numeric)")
-    p_ts.add_argument("--time-col", default="time", help="Time column name (default: time)")
+    p_ts.add_argument("--index-col", default=None,
+                      help="Index column name (auto-detects: time, filename, image_idx)")
     p_ts.add_argument("-i", "--interactive", action="store_true",
                       help="Generate interactive Plotly chart (HTML output)")
     p_ts.add_argument("--normalize", action="store_true",
                       help="Normalize features to [0,1] for comparison (interactive only)")
+    p_ts.add_argument("--show-diff", action="store_true",
+                      help="Plot first-order differences (auto for video)")
+    p_ts.add_argument("--rolling-window", type=int, default=None,
+                      help="Overlay rolling average with window size (auto=5 for video)")
+    p_ts.add_argument("--no-auto-video", action="store_true",
+                      help="Disable auto diff/rolling for video data")
     p_ts.set_defaults(func=cmd_timeseries)
 
     # heatmap
@@ -391,7 +635,7 @@ def main():
     p_sc.add_argument("input", type=Path, help="CSV file with scores")
     p_sc.add_argument("-o", "--output", type=Path, help="Output image path")
     p_sc.add_argument("--features", nargs="+", help="Features to project (supports glob patterns)")
-    p_sc.add_argument("--method", default="pca", choices=["pca", "umap", "tsne"],
+    p_sc.add_argument("--method", default="pca", choices=PROJECTION_METHODS,
                       help="Projection method (default: pca)")
     p_sc.add_argument("--color-by", help="Column to use for coloring points")
     p_sc.add_argument("-i", "--interactive", action="store_true",
@@ -418,7 +662,7 @@ def main():
                       help="Features for scatter projection (supports glob patterns)")
     p_ex.add_argument("--timeseries-features", nargs="+",
                       help="Features for timeseries (default: color-by or first scalar features)")
-    p_ex.add_argument("--method", default="pca", choices=["pca", "umap", "tsne"],
+    p_ex.add_argument("--method", default="pca", choices=PROJECTION_METHODS,
                       help="Projection method (default: pca)")
     p_ex.add_argument("--time-col", default="time", help="Time column name (default: time)")
     p_ex.add_argument("--color-by", help="Column to use for coloring scatter points")
@@ -454,6 +698,46 @@ def main():
     p_img.add_argument("--max-rows", type=int, default=100,
                       help="Maximum rows to include in browse mode (default: 100)")
     p_img.set_defaults(func=cmd_image)
+
+    # hyperplot (HyperTools visualization)
+    p_hyp = subparsers.add_parser("hyperplot", help="HyperTools 3D/animation visualization")
+    p_hyp.add_argument("input", type=Path, help="CSV file with scores")
+    p_hyp.add_argument("-o", "--output", type=Path, help="Output file path")
+    p_hyp.add_argument("--features", nargs="+",
+                      help="Features to include (supports glob patterns)")
+    p_hyp.add_argument("--dims", type=int, default=3, choices=[2, 3],
+                      help="Number of dimensions (default: 3)")
+    p_hyp.add_argument("--method", default="pca", choices=["pca", "umap", "ppca"],
+                      help="Reduction method (default: pca)")
+    p_hyp.add_argument("--n-clusters", type=int,
+                      help="Auto-cluster into N groups and color by cluster")
+    p_hyp.add_argument("--group", type=str,
+                      help="Column name for categorical coloring (overrides n-clusters)")
+    p_hyp.add_argument("--animate", action="store_true",
+                      help="Create trajectory animation (connects points in row order)")
+    p_hyp.set_defaults(func=cmd_hyperplot)
+
+    # dashboard (interactive model-visualization explorer)
+    p_dash = subparsers.add_parser("dashboard", help="Interactive model-visualization dashboard")
+    p_dash.add_argument("input", type=Path, help="CSV file with scores")
+    p_dash.add_argument("-o", "--output", type=Path, help="Output HTML path")
+    p_dash.add_argument("--width", type=int, default=900, help="Plot width in pixels (default: 900)")
+    p_dash.add_argument("--height", type=int, default=600, help="Plot height in pixels (default: 600)")
+    p_dash.add_argument("--image-root", type=str, help="Base directory for image lookup")
+    p_dash.add_argument("--video-path", type=str, help="Video file for frame extraction")
+    p_dash.add_argument("--hdf5-path", type=str, help="HDF5 file for image extraction")
+    p_dash.add_argument("--max-thumbnails", type=int, default=100,
+                       help="Max images to embed as thumbnails (default: 100, 0 to disable)")
+    p_dash.add_argument("--no-images", action="store_true", help="Disable image thumbnails in detail panel")
+    p_dash.add_argument("--open", action="store_true", help="Open dashboard in browser after creation")
+    p_dash.set_defaults(func=cmd_dashboard)
+
+    # recommend (analyze CSV and suggest visualizations)
+    p_rec = subparsers.add_parser("recommend", help="Analyze CSV and recommend visualizations")
+    p_rec.add_argument("input", type=Path, help="CSV file with scores")
+    p_rec.add_argument("--matrix", action="store_true",
+                      help="Show full visualization matrix for all models")
+    p_rec.set_defaults(func=cmd_recommend)
 
     args = parser.parse_args()
 
