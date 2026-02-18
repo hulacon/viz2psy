@@ -164,7 +164,13 @@ class MetadataBuilder:
         }
         self.index_column = "filename"
 
-    def set_input_video(self, path: Path, frame_interval: float, n_frames: int):
+    def set_input_video(
+        self,
+        path: Path,
+        frame_interval: float,
+        n_frames: int,
+        saved_frames_dir: Path | None = None,
+    ):
         """Set input info for video file."""
         self.input_info = {
             "type": "video",
@@ -172,6 +178,8 @@ class MetadataBuilder:
             "frame_interval_sec": frame_interval,
             "n_frames": n_frames
         }
+        if saved_frames_dir is not None:
+            self.input_info["saved_frames_dir"] = str(saved_frames_dir.resolve())
         self.index_column = "time"
 
     def set_output(self, path: Path, rows: int, columns: int):

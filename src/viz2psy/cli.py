@@ -301,7 +301,7 @@ def _process_video(
 
     # Set metadata input info
     if metadata:
-        metadata.set_input_video(video_path, frame_interval, n_frames)
+        metadata.set_input_video(video_path, frame_interval, n_frames, save_frames)
 
     # Warn if memory might be an issue
     use_temp_dir = False

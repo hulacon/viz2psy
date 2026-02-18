@@ -411,6 +411,8 @@ class UnifiedImageResolver:
         Override for image directory (image_folder only).
     video_path : Path, optional
         Override for video file path.
+    frames_dir : Path, optional
+        Override for saved video frames directory.
     hdf5_path : Path, optional
         Override for HDF5 file path.
     hdf5_dataset : str, optional
@@ -423,6 +425,7 @@ class UnifiedImageResolver:
         sidecar: SidecarMetadata | None = None,
         image_root: Path | str | None = None,
         video_path: Path | str | None = None,
+        frames_dir: Path | str | None = None,
         hdf5_path: Path | str | None = None,
         hdf5_dataset: str | None = None,
     ):
@@ -430,6 +433,7 @@ class UnifiedImageResolver:
         self.sidecar = sidecar
         self.image_root = Path(image_root) if image_root else None
         self.video_path = Path(video_path) if video_path else None
+        self.frames_dir = Path(frames_dir) if frames_dir else None
         self.hdf5_path = Path(hdf5_path) if hdf5_path else None
         self.hdf5_dataset = hdf5_dataset
 
@@ -447,6 +451,7 @@ class UnifiedImageResolver:
         # Extract paths from sidecar if available
         self._sidecar_paths = None  # For image_folder
         self._sidecar_video_path = None
+        self._sidecar_saved_frames_dir = None
         self._sidecar_hdf5_path = None
         self._sidecar_hdf5_dataset = None
         self._sidecar_hdf5_indices = None
@@ -463,6 +468,9 @@ class UnifiedImageResolver:
                 if path:
                     self._sidecar_video_path = Path(path)
                 self._frame_interval = input_info.get("frame_interval_sec")
+                saved_frames = input_info.get("saved_frames_dir")
+                if saved_frames:
+                    self._sidecar_saved_frames_dir = Path(saved_frames)
 
             elif self.input_type == "hdf5_brick":
                 path = input_info.get("path")
@@ -544,19 +552,31 @@ class UnifiedImageResolver:
         self,
         row: pd.Series,
         row_idx: int,
-    ) -> Image.Image | None:
-        """Extract frame from video at given timestamp."""
-        # Get video path
-        video_path = self.video_path or self._sidecar_video_path
-        if not video_path or not video_path.exists():
-            return None
+    ) -> Path | Image.Image | None:
+        """Extract frame from video at given timestamp.
 
+        If saved frames directory exists (from --save-frames), returns Path.
+        Otherwise extracts from video and returns PIL Image.
+        """
         # Get timestamp from row
         time_col = "time"
         if time_col not in row.index:
             return None
 
         timestamp = row[time_col]
+
+        # Check for saved frames first (CLI override or sidecar)
+        frames_dir = self.frames_dir or self._sidecar_saved_frames_dir
+        if frames_dir and frames_dir.exists():
+            # Frame naming convention: frame_{time:.3f}.png
+            frame_path = frames_dir / f"frame_{timestamp:.3f}.png"
+            if frame_path.exists():
+                return frame_path
+
+        # Fall back to extracting from video
+        video_path = self.video_path or self._sidecar_video_path
+        if not video_path or not video_path.exists():
+            return None
 
         try:
             import cv2
@@ -662,6 +682,7 @@ def create_unified_resolver(
     csv_path: str | Path,
     image_root: str | Path | None = None,
     video_path: str | Path | None = None,
+    frames_dir: str | Path | None = None,
     hdf5_path: str | Path | None = None,
     hdf5_dataset: str | None = None,
 ) -> UnifiedImageResolver:
@@ -675,6 +696,8 @@ def create_unified_resolver(
         Override for image directory (image_folder only).
     video_path : str or Path, optional
         Override for video file path.
+    frames_dir : str or Path, optional
+        Override for saved video frames directory.
     hdf5_path : str or Path, optional
         Override for HDF5 file path.
     hdf5_dataset : str, optional
@@ -691,6 +714,7 @@ def create_unified_resolver(
         sidecar=sidecar,
         image_root=image_root,
         video_path=video_path,
+        frames_dir=frames_dir,
         hdf5_path=hdf5_path,
         hdf5_dataset=hdf5_dataset,
     )

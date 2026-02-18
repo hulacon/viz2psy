@@ -268,6 +268,7 @@ def cmd_image(args):
         args.scores,
         image_root=args.image_root,
         video_path=args.video_path,
+        frames_dir=args.frames_dir,
         hdf5_path=args.hdf5_path,
         hdf5_dataset=args.hdf5_dataset,
     )
@@ -421,6 +422,7 @@ def cmd_dashboard(args):
                 sidecar=sidecar,
                 image_root=Path(args.image_root) if args.image_root else None,
                 video_path=Path(args.video_path) if args.video_path else None,
+                frames_dir=Path(args.frames_dir) if args.frames_dir else None,
                 hdf5_path=Path(args.hdf5_path) if args.hdf5_path else None,
             )
             print(f"Image resolver: {image_resolver.input_type or 'auto-detect'}")
@@ -681,6 +683,8 @@ def main():
                       help="Base directory for resolving image paths (image_folder input)")
     p_img.add_argument("--video-path", type=Path,
                       help="Path to video file (overrides sidecar, for video input)")
+    p_img.add_argument("--frames-dir", type=Path,
+                      help="Path to saved video frames directory (avoids re-extracting from video)")
     p_img.add_argument("--hdf5-path", type=Path,
                       help="Path to HDF5 file (overrides sidecar, for hdf5_brick input)")
     p_img.add_argument("--hdf5-dataset", type=str, default="stimuli",
@@ -725,6 +729,7 @@ def main():
     p_dash.add_argument("--height", type=int, default=600, help="Plot height in pixels (default: 600)")
     p_dash.add_argument("--image-root", type=str, help="Base directory for image lookup")
     p_dash.add_argument("--video-path", type=str, help="Video file for frame extraction")
+    p_dash.add_argument("--frames-dir", type=str, help="Saved video frames directory (avoids re-extracting)")
     p_dash.add_argument("--hdf5-path", type=str, help="HDF5 file for image extraction")
     p_dash.add_argument("--max-thumbnails", type=int, default=100,
                        help="Max images to embed as thumbnails (default: 100, 0 to disable)")
