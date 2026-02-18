@@ -49,6 +49,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Saliency maps display smaller than source images in browse mode
 - Saliency model uses CPU on Apple Silicon (MPS doesn't support float64)
 
+## v0.3.0 (2026-02-18)
+
+### Feat
+
+- **viz**: optimize viewer performance and UX
+- **viz**: reuse saved video frames in visualization
+
+### Fix
+
+- add missing dependencies and structured error handling
+
 ## v0.2.0 (2026-02-17)
 
 ### Feat
