@@ -48,7 +48,7 @@ df = score_images(model, ["photo1.jpg", "photo2.jpg"])
 
 ### Image Analysis
 
-| Emotions (EmoNet) | Object Detection (YOLO) | Saliency Map |
+| Emotions (EmoNet) | Object Detection (YOLO) | Saliency Map (DeepGaze IIE) |
 |:-----------------:|:-----------------------:|:------------:|
 | ![Emotions](docs/images/image_emonet.png) | ![Objects](docs/images/image_objects.png) | ![Saliency](docs/images/image_saliency.png) |
 
