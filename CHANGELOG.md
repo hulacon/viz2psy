@@ -44,6 +44,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `docs/visualization.md` - Visualization guide
   - `docs/api.md` - Python API reference
 
+## v0.5.0 (2026-02-19)
+
+### Feat
+
+- **viz**: add Browse All Images button to dashboard
+- **viz**: add axis labels, caption wrapping, and example screenshots
+- **viz**: add smoothing toggle and human-readable labels to dashboard
+
 ## v0.4.0 (2026-02-19)
 
 ### Feat
