@@ -1056,6 +1056,19 @@ def _build_dashboard_html(
             opacity: 0.4;
             cursor: not-allowed;
         }}
+        .browse-btn {{
+            padding: 8px 16px;
+            font-size: 14px;
+            border: 2px solid #4caf50;
+            border-radius: 4px;
+            background: #e8f4e8;
+            cursor: pointer;
+            transition: all 0.2s;
+        }}
+        .browse-btn:hover {{
+            background: #c8e6c9;
+            border-color: #388e3c;
+        }}
         .sub-options {{
             display: none;
             margin-top: 10px;
@@ -1177,6 +1190,13 @@ def _build_dashboard_html(
                         <button data-sub="animated" onclick="selectSubOption('trajectory', 'animated')">▶ Animated</button>
                     </div>
                 </div>
+            </div>
+
+            <div class="control-group">
+                <label>Image Browser</label>
+                <button class="browse-btn" onclick="openViewer(0)">
+                    🖼️ Browse All Images
+                </button>
             </div>
         </div>
 
