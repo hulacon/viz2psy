@@ -811,11 +811,9 @@ def _generate_visualizations(
     image_paths: list[Path] | None = None,
     quiet: bool = False,
 ):
-    """Generate dashboard and browse viewer HTML files after processing."""
+    """Generate dashboard HTML file after processing."""
     import pandas as pd
     from viz2psy.viz.dashboard import create_dashboard
-    from viz2psy.viz.interactive.single_image import create_browsable_viewer
-    from viz2psy.viz.interactive.base import save_figure
     from viz2psy.viz.sidecar import load_sidecar, UnifiedImageResolver
 
     sidecar = load_sidecar(output_path)
@@ -842,7 +840,7 @@ def _generate_visualizations(
         if not quiet:
             print(f"Note: Could not set up image resolver for viz: {e}")
 
-    # Generate dashboard
+    # Generate dashboard (includes browsable viewer)
     dashboard_path = output_path.parent / f"{output_path.stem}_dashboard.html"
     try:
         html = create_dashboard(
@@ -851,7 +849,7 @@ def _generate_visualizations(
             image_resolver=image_resolver,
             width=900,
             height=600,
-            max_thumbnails=100,
+            max_thumbnails=1000,
         )
         with open(dashboard_path, "w") as f:
             f.write(html)
@@ -860,26 +858,6 @@ def _generate_visualizations(
     except Exception as e:
         if not quiet:
             print(f"Note: Could not generate dashboard: {e}")
-
-    # Generate browse viewer
-    browse_path = output_path.parent / f"{output_path.stem}_browse.html"
-    try:
-        fig = create_browsable_viewer(
-            scores_df=result_df,
-            image_resolver=image_resolver,
-            panels=None,  # auto-detect
-            width=1200,
-            height=700,
-            max_rows=100,
-            sidecar=sidecar,
-            normalize_scalars=True,
-        )
-        save_figure(fig, browse_path)
-        if not quiet:
-            print(f"Browse viewer saved to {browse_path}")
-    except Exception as e:
-        if not quiet:
-            print(f"Note: Could not generate browse viewer: {e}")
 
 
 def main():

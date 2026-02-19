@@ -67,42 +67,48 @@ class SidecarMetadata:
 
     def get_semantic_label(self, column: str) -> str:
         """Get semantic label for a column, or return column name if not found."""
-        model_name = self.get_model_for_column(column)
-        if not model_name:
-            return column
-
-        # For named columns, the column name IS the semantic label
-        features = self.models[model_name].get("features", {})
-        if "columns" in features:
-            return column  # Already semantic (e.g., "Adoration", "memorability")
-
-        # For pattern-based, extract index and lookup if definitions exist
-        pattern = features.get("pattern", "")
-
-        # Handle places scenes and sun attributes specially
+        # Handle prefixed columns first (places_, sunattr_, yolo_) regardless of storage format
+        # These always benefit from cleanup even if stored as named columns
         if column.startswith("places_"):
-            defs = self.feature_definitions.get("places", {})
-            if isinstance(defs, dict):
-                scenes = defs.get("scenes", [])
-                idx = self._extract_index(column, "places_")
-                if idx is not None and idx < len(scenes):
-                    return scenes[idx]
+            # Try numeric index format first (places_000)
+            idx = self._extract_index(column, "places_")
+            if idx is not None:
+                defs = self.feature_definitions.get("places", {})
+                if isinstance(defs, dict):
+                    scenes = defs.get("scenes", [])
+                    if idx < len(scenes):
+                        return scenes[idx].replace("_", " ").title()
+            else:
+                # Handle places_scenename format - strip prefix and clean up
+                scene_name = column.replace("places_", "")
+                return scene_name.replace("_", " ").title()
 
         if column.startswith("sunattr_"):
-            defs = self.feature_definitions.get("places", {})
-            if isinstance(defs, dict):
-                attrs = defs.get("attributes", [])
-                idx = self._extract_index(column, "sunattr_")
-                if idx is not None and idx < len(attrs):
-                    return attrs[idx]
+            # Try numeric index format first (sunattr_000)
+            idx = self._extract_index(column, "sunattr_")
+            if idx is not None:
+                defs = self.feature_definitions.get("places", {})
+                if isinstance(defs, dict):
+                    attrs = defs.get("attributes", [])
+                    if idx < len(attrs):
+                        return attrs[idx].replace("_", " ").title()
+            else:
+                # Handle sunattr_attrname format
+                attr_name = column.replace("sunattr_", "")
+                return attr_name.replace("_", " ").title()
 
         if column.startswith("yolo_"):
-            defs = self.feature_definitions.get("yolo", {})
-            if isinstance(defs, dict):
-                objects = defs.get("objects", [])
-                obj_name = column.replace("yolo_", "")
-                if obj_name in objects:
-                    return obj_name
+            # Strip prefix and clean up object name
+            obj_name = column.replace("yolo_", "")
+            return obj_name.replace("_", " ").title()
+
+        # For other columns, check if the model has named columns
+        model_name = self.get_model_for_column(column)
+        if model_name:
+            features = self.models[model_name].get("features", {})
+            if "columns" in features:
+                # Already semantic (e.g., "Adoration", "memorability")
+                return column
 
         # For clip_, gist_, dinov2_, saliency_ - no semantic labels available
         return column

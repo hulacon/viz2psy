@@ -278,15 +278,25 @@ def _create_timeseries_trace(
     model_name: str,
     x_values: np.ndarray,
     x_label: str,
-) -> list[go.Scatter]:
-    """Create timeseries traces for a model."""
+    rolling_window: int = 10,
+    sidecar: "SidecarMetadata | None" = None,
+) -> tuple[list[go.Scatter], list[go.Scatter]]:
+    """Create timeseries traces for a model.
+
+    Returns
+    -------
+    raw_traces : list[go.Scatter]
+        Raw value traces.
+    rolling_traces : list[go.Scatter]
+        Rolling average traces (initially hidden).
+    """
     config = FEATURE_CONFIGS.get(model_name)
     if not config or not config.timeseries:
-        return []
+        return [], []
 
     cols = _get_model_columns(df, model_name)
     if not cols:
-        return []
+        return [], []
 
     # Limit columns for high-dim models
     if config.timeseries_mode == "top_k":
@@ -295,25 +305,55 @@ def _create_timeseries_trace(
         variances.sort(key=lambda x: x[1], reverse=True)
         cols = [c for c, _ in variances[:config.top_k]]
     elif config.timeseries_mode == "none":
-        return []
+        return [], []
 
     # Create customdata for click handling (row indices)
     n_points = len(df)
     customdata = np.arange(n_points).reshape(-1, 1)
 
-    traces = []
+    # Validate rolling window
+    effective_window = min(rolling_window, max(1, n_points // 3))
+
+    # Get semantic labels from sidecar if available
+    if sidecar:
+        label_map = sidecar.get_feature_labels(cols)
+    else:
+        label_map = {col: col for col in cols}
+
+    raw_traces = []
+    rolling_traces = []
+
     for col in cols:
-        traces.append(go.Scatter(
+        values = df[col].values
+        label = label_map.get(col, col)
+
+        # Raw trace
+        raw_traces.append(go.Scatter(
             x=x_values,
-            y=df[col].values,
+            y=values,
             mode="lines+markers",
-            name=col,
+            name=label,
             customdata=customdata,
             marker=dict(size=6, opacity=0.7),
-            hovertemplate=f"{col}<br>{x_label}: %{{x}}<br>Value: %{{y:.4f}}<extra></extra>",
+            hovertemplate=f"{label}<br>{x_label}: %{{x}}<br>Value: %{{y:.4f}}<extra></extra>",
         ))
 
-    return traces
+        # Rolling average trace (same name/color as raw, just smoothed data)
+        rolling_avg = pd.Series(values).rolling(
+            window=effective_window, center=True
+        ).mean().values
+        rolling_traces.append(go.Scatter(
+            x=x_values,
+            y=rolling_avg,
+            mode="lines",
+            name=label,
+            customdata=customdata,
+            line=dict(width=3),
+            hovertemplate=f"{label} (avg {effective_window})<br>{x_label}: %{{x}}<br>Value: %{{y:.4f}}<extra></extra>",
+            visible=False,  # Hidden by default
+        ))
+
+    return raw_traces, rolling_traces
 
 
 def _create_cluster_trace(
@@ -711,7 +751,7 @@ def create_dashboard(
             continue
 
         viz_data[model] = {
-            "timeseries": {"available": config.timeseries, "traces": [], "layout": {}},
+            "timeseries": {"available": config.timeseries, "traces": [], "rolling_traces": [], "layout": {}},
             "clustering_2d": {"available": config.mds_clustering, "traces": [], "layout": {}},
             "clustering_3d": {"available": config.mds_clustering, "traces": [], "layout": {}},
             "trajectory_static": {"available": config.trajectories, "traces": [], "layout": {}},
@@ -720,9 +760,10 @@ def create_dashboard(
 
         # Timeseries
         if config.timeseries:
-            traces = _create_timeseries_trace(df, model, x_values, x_label)
-            if traces:
-                viz_data[model]["timeseries"]["traces"] = traces
+            raw_traces, rolling_traces = _create_timeseries_trace(df, model, x_values, x_label, sidecar=sidecar)
+            if raw_traces:
+                viz_data[model]["timeseries"]["traces"] = raw_traces
+                viz_data[model]["timeseries"]["rolling_traces"] = rolling_traces
                 viz_data[model]["timeseries"]["layout"] = {
                     "xaxis_title": x_label,
                     "yaxis_title": "Value",
@@ -880,12 +921,14 @@ def _build_dashboard_html(
 
     # Serialize trace data to JSON
     traces_json = {}
+    rolling_traces_json = {}
     layouts_json = {}
     frames_json = {}
     availability_json = {}
 
     for model, vizs in viz_data.items():
         traces_json[model] = {}
+        rolling_traces_json[model] = {}
         layouts_json[model] = {}
         frames_json[model] = {}
         availability_json[model] = {}
@@ -900,6 +943,14 @@ def _build_dashboard_html(
                 ]
                 layouts_json[model][viz_type] = data["layout"]
 
+                # Handle rolling traces for timeseries
+                if data.get("rolling_traces"):
+                    rolling_traces_json[model][viz_type] = [
+                        _numpy_to_python(trace.to_plotly_json()) for trace in data["rolling_traces"]
+                    ]
+                else:
+                    rolling_traces_json[model][viz_type] = []
+
                 # Handle animation frames
                 if data.get("frames"):
                     frames_json[model][viz_type] = [
@@ -913,6 +964,7 @@ def _build_dashboard_html(
                     frames_json[model][viz_type] = []
             else:
                 traces_json[model][viz_type] = []
+                rolling_traces_json[model][viz_type] = []
                 layouts_json[model][viz_type] = {}
                 frames_json[model][viz_type] = []
 
@@ -1034,6 +1086,18 @@ def _build_dashboard_html(
         .sub-toggle button:hover:not(.active) {{
             background: #e0e0e0;
         }}
+        .toggle-label {{
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 14px;
+        }}
+        .toggle-label input[type="checkbox"] {{
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }}
         .plot-container {{
             background: white;
             border-radius: 8px;
@@ -1093,6 +1157,13 @@ def _build_dashboard_html(
                     </button>
                 </div>
 
+                <div id="sub-timeseries" class="sub-options">
+                    <label class="toggle-label">
+                        <input type="checkbox" id="rolling-toggle" onchange="toggleRolling()">
+                        <span>Smooth (10-frame avg)</span>
+                    </label>
+                </div>
+
                 <div id="sub-clustering" class="sub-options">
                     <div class="sub-toggle">
                         <button class="active" data-sub="2d" onclick="selectSubOption('clustering', '2d')">2D</button>
@@ -1122,6 +1193,7 @@ def _build_dashboard_html(
     <script>
         // Data
         const traces = {json.dumps(traces_json)};
+        const rollingTraces = {json.dumps(rolling_traces_json)};
         const layouts = {json.dumps(layouts_json)};
         const frames = {json.dumps(frames_json)};
         const availability = {json.dumps(availability_json)};
@@ -1132,6 +1204,7 @@ def _build_dashboard_html(
         // State
         let currentModel = '{models[0] if models else ""}';
         let currentViz = 'timeseries';
+        let showRolling = false;
         let subOptions = {{
             clustering: '2d',
             trajectory: 'static'
@@ -1210,9 +1283,15 @@ def _build_dashboard_html(
             }});
 
             // Show/hide sub-options
+            document.getElementById('sub-timeseries').classList.toggle('visible', viz === 'timeseries');
             document.getElementById('sub-clustering').classList.toggle('visible', viz === 'clustering');
             document.getElementById('sub-trajectory').classList.toggle('visible', viz === 'trajectory');
 
+            updatePlot();
+        }}
+
+        function toggleRolling() {{
+            showRolling = document.getElementById('rolling-toggle').checked;
             updatePlot();
         }}
 
@@ -1291,9 +1370,18 @@ def _build_dashboard_html(
             plotDiv.style.display = 'block';
             warningDiv.style.display = 'none';
 
-            const traceData = traces[currentModel][vizKey];
+            let traceData = traces[currentModel][vizKey];
             const layoutData = layouts[currentModel][vizKey];
             const frameData = frames[currentModel] && frames[currentModel][vizKey];
+
+            // Swap to rolling traces for timeseries if enabled
+            if (vizKey === 'timeseries' && showRolling) {{
+                const rolling = rollingTraces[currentModel] && rollingTraces[currentModel][vizKey];
+                if (rolling && rolling.length > 0) {{
+                    // Replace raw traces with rolling traces (same colors/names)
+                    traceData = rolling.map(t => ({{...t, visible: true}}));
+                }}
+            }}
 
             // Build layout
             let layout = {{
@@ -1397,6 +1485,8 @@ def _build_dashboard_html(
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {{
+            // Show timeseries sub-options by default
+            document.getElementById('sub-timeseries').classList.add('visible');
             updatePlot();
         }});
     </script>
