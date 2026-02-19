@@ -44,11 +44,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `docs/visualization.md` - Visualization guide
   - `docs/api.md` - Python API reference
 
-### Known Issues
-
-- Saliency maps display smaller than source images in browse mode
-- Saliency model uses CPU on Apple Silicon (MPS doesn't support float64)
-
 ## v0.3.0 (2026-02-18)
 
 ### Feat

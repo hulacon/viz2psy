@@ -1341,9 +1341,10 @@ def create_browsable_viewer(
     panels: list[str] | None = None,
     width: int = 1200,
     height: int = 700,
-    max_rows: int = 100,
+    max_rows: int = 1000,
     sidecar: SidecarMetadata | None = None,
     normalize_scalars: bool = True,
+    embed_images: bool = False,
 ) -> go.Figure:
     """Create a browsable viewer with slider to navigate through rows.
 
@@ -1362,11 +1363,14 @@ def create_browsable_viewer(
     height : int
         Figure height.
     max_rows : int
-        Maximum number of rows to include (for memory).
+        Maximum number of rows to include (default: 500).
     sidecar : SidecarMetadata, optional
         Sidecar metadata for semantic labels.
     normalize_scalars : bool
         Normalize scalar features to [0, 1].
+    embed_images : bool
+        If True, embed images as base64 (portable but large files).
+        If False (default), use file:// URLs (fast, requires images to stay in place).
 
     Returns
     -------
@@ -1415,35 +1419,45 @@ def create_browsable_viewer(
         panels = ["scalars"]  # Fallback
 
     # Pre-render all images and feature data for ALL panel types
-    print(f"Pre-rendering {n_rows} frames for {len(panels)} panel types...")
+    mode_desc = "embedded" if embed_images else "file:// URLs"
+    print(f"Pre-rendering {n_rows} frames for {len(panels)} panel types ({mode_desc})...")
     frames_data = []
 
     for idx in range(n_rows):
-        if idx % 50 == 0:
+        if idx % 100 == 0:
             print(f"  Processing frame {idx}/{n_rows}...")
         row = scores_df.iloc[idx]
 
         # Get image
         image = image_resolver.resolve(scores_df, idx) if image_resolver else None
-        img_b64 = None
+        img_src = None  # Will be either base64 data URI or file:// URL
         img_aspect = 1.0  # Default aspect ratio (width/height)
 
         if image is None:
             pass
         elif isinstance(image, PILImage.Image):
+            # PIL Image (from video frame or HDF5) - must embed
             img_aspect = image.width / image.height if image.height > 0 else 1.0
             buf = io.BytesIO()
             image.save(buf, format="PNG")
             buf.seek(0)
-            img_b64 = base64.b64encode(buf.read()).decode("utf-8")
+            img_src = f"data:image/png;base64,{base64.b64encode(buf.read()).decode('utf-8')}"
         else:
             # Path to image file
+            image_path = Path(image) if not isinstance(image, Path) else image
             try:
-                with PILImage.open(image) as img:
+                with PILImage.open(image_path) as img:
                     img_aspect = img.width / img.height if img.height > 0 else 1.0
             except Exception:
                 pass
-            img_b64 = encode_image_base64(image)
+
+            if embed_images:
+                # Embed as base64
+                img_src = f"data:image/png;base64,{encode_image_base64(image_path)}"
+            else:
+                # Use file:// URL (much faster, smaller HTML)
+                abs_path = image_path.resolve()
+                img_src = f"file://{abs_path}"
 
         # Get feature data for ALL panel types
         panel_data = {}
@@ -1458,7 +1472,7 @@ def create_browsable_viewer(
 
         frames_data.append({
             "idx": idx,
-            "img_b64": img_b64,
+            "img_src": img_src,
             "img_aspect": img_aspect,
             "panel_data": panel_data,
             "label": label,
@@ -1491,9 +1505,9 @@ def create_browsable_viewer(
 
         # Build layout update with image or placeholder
         layout_update = {}
-        if frame_data["img_b64"]:
+        if frame_data["img_src"]:
             layout_update["images"] = [dict(
-                source=f"data:image/png;base64,{frame_data['img_b64']}",
+                source=frame_data["img_src"],
                 xref="paper",
                 yref="paper",
                 x=0,
@@ -1529,9 +1543,9 @@ def create_browsable_viewer(
     fig.frames = frames
 
     # Add initial image or placeholder
-    if first_frame["img_b64"]:
+    if first_frame["img_src"]:
         fig.add_layout_image(dict(
-            source=f"data:image/png;base64,{first_frame['img_b64']}",
+            source=first_frame["img_src"],
             xref="paper",
             yref="paper",
             x=0,
@@ -1554,6 +1568,10 @@ def create_browsable_viewer(
             font=dict(size=14, color="gray"),
             align="center",
         ))
+
+    # Print file size warning for embedded images
+    if embed_images and n_rows > 50:
+        print(f"  Note: HTML file may be large with {n_rows} embedded images")
 
     # Create slider
     sliders = [dict(

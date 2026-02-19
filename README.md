@@ -1,6 +1,6 @@
 # viz2psy
 
-Extract psychological and perceptual features from images using multiple computational models.
+This is a toolbox meant to enable bulk calculation and exploration of psychological features of images and/or movie frames. Features are extracted from images using a command line interface which wraps multiple computational models used in computer vision and human psychology. Features are stored in tabular format (csv) and a basic html viewer for interacting with the data is provided. Please note that computation of the features from all available models requires a non-trivial amount of dedicated hardware and a moderate-to-fancy workstation or compute cluster is recommended.
 
 ## Features
 
@@ -52,7 +52,7 @@ df = score_images(model, ["photo1.jpg", "photo2.jpg"])
 | [Models](docs/models.md) | Available models, outputs, and references |
 | [Visualization](docs/visualization.md) | `viz2psy-viz` CLI and interactive features |
 | [API](docs/api.md) | Python API reference |
-| [Known Issues](KNOWN_ISSUES.md) | Current limitations |
+| [Changelog](CHANGELOG.md) | Version history and release notes |
 
 ## Available Models
 
@@ -72,6 +72,14 @@ df = score_images(model, ["photo1.jpg", "photo2.jpg"])
 
 See [docs/models.md](docs/models.md) for detailed documentation.
 
+## Hardware Requirements
+
+- **GPU**: NVIDIA (CUDA) or Apple Silicon (MPS) recommended; CPU fallback supported but significantly slower
+- **VRAM**: 8GB minimum for most models; 12GB+ recommended for running multiple models
+- **RAM**: 16GB minimum, 32GB recommended for parallel model execution (`--parallel`)
+- **Disk**: ~10GB for model weights (downloaded automatically on first use)
+- **Output**: ~60MB per 1000 images when using all models (~2900 feature columns)
+
 ## Citation
 
 If you use viz2psy in your research, please cite the relevant model papers:
@@ -81,6 +89,12 @@ If you use viz2psy in your research, please cite the relevant model papers:
 - **CLIP**: Radford et al. (2021). *ICML*.
 - **BLIP**: Li et al. (2022). *ICML*.
 - **DINOv2**: Oquab et al. (2023). *arXiv*.
+- **GIST**: Oliva & Torralba (2001). *International Journal of Computer Vision*.
+- **Places365**: Zhou et al. (2017). *IEEE TPAMI*.
+- **LLStat**: Hasler & Suesstrunk (2003). *SPIE*. (colorfulness metric)
+- **DeepGaze IIE** (saliency): Kümmerer et al. (2022). *Journal of Vision*.
+- **LAION Aesthetics**: Schuhmann et al. (2022). *NeurIPS Datasets*.
+- **YOLOv8**: Jocher et al. (2023). Ultralytics.
 
 ## License
 

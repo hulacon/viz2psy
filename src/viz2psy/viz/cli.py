@@ -294,6 +294,7 @@ def cmd_image(args):
             max_rows=args.max_rows,
             sidecar=sidecar,
             normalize_scalars=not args.no_normalize,
+            embed_images=args.embed_images,
         )
 
         # Determine output path
@@ -436,6 +437,7 @@ def cmd_dashboard(args):
         width=args.width,
         height=args.height,
         max_thumbnails=args.max_thumbnails,
+        embed_images=args.embed_images,
     )
 
     # Determine output path
@@ -699,8 +701,10 @@ def main():
                       help="Enable browse mode with slider for multiple rows (auto-detected if multiple rows)")
     p_img.add_argument("--no-browse", action="store_false", dest="browse",
                       help="Disable browse mode (single image only)")
-    p_img.add_argument("--max-rows", type=int, default=100,
-                      help="Maximum rows to include in browse mode (default: 100)")
+    p_img.add_argument("--max-rows", type=int, default=1000,
+                      help="Maximum rows to include in browse mode (default: 1000)")
+    p_img.add_argument("--embed-images", action="store_true",
+                      help="Embed images as base64 (portable but larger file). Default uses file:// URLs.")
     p_img.set_defaults(func=cmd_image)
 
     # hyperplot (HyperTools visualization)
@@ -731,9 +735,11 @@ def main():
     p_dash.add_argument("--video-path", type=str, help="Video file for frame extraction")
     p_dash.add_argument("--frames-dir", type=str, help="Saved video frames directory (avoids re-extracting)")
     p_dash.add_argument("--hdf5-path", type=str, help="HDF5 file for image extraction")
-    p_dash.add_argument("--max-thumbnails", type=int, default=100,
-                       help="Max images to embed as thumbnails (default: 100, 0 to disable)")
+    p_dash.add_argument("--max-thumbnails", type=int, default=1000,
+                       help="Max rows to include in viewer (default: 1000)")
     p_dash.add_argument("--no-images", action="store_true", help="Disable image thumbnails in detail panel")
+    p_dash.add_argument("--embed-images", action="store_true",
+                       help="Embed images as base64 (portable but larger file). Default uses file:// URLs.")
     p_dash.add_argument("--open", action="store_true", help="Open dashboard in browser after creation")
     p_dash.set_defaults(func=cmd_dashboard)
 

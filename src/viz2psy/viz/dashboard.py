@@ -540,6 +540,18 @@ def _create_trajectory_animated(
 
     n_points = len(X_2d)
 
+    # Limit animation frames to avoid huge HTML files
+    # For large datasets, subsample to ~100 frames
+    max_frames = 100
+    if n_points > max_frames:
+        frame_step = n_points // max_frames
+        frame_indices = list(range(0, n_points, frame_step))
+        # Always include the last point
+        if frame_indices[-1] != n_points - 1:
+            frame_indices.append(n_points - 1)
+    else:
+        frame_indices = list(range(n_points))
+
     # Determine axis ranges with padding
     x_min, x_max = X_2d[:, 0].min(), X_2d[:, 0].max()
     y_min, y_max = X_2d[:, 1].min(), X_2d[:, 1].max()
@@ -593,9 +605,9 @@ def _create_trajectory_animated(
         ),
     ]
 
-    # Create animation frames
+    # Create animation frames (subsampled for large datasets)
     frames = []
-    for i in range(n_points):
+    for i in frame_indices:
         frame_data = [
             # Trail up to current point
             go.Scatter(
@@ -645,7 +657,8 @@ def create_dashboard(
     image_resolver: "UnifiedImageResolver | None" = None,
     width: int = 900,
     height: int = 600,
-    max_thumbnails: int = 100,
+    max_thumbnails: int = 1000,
+    embed_images: bool = False,
 ) -> str:
     """Create an interactive dashboard HTML.
 
@@ -663,8 +676,10 @@ def create_dashboard(
     height : int
         Figure height in pixels.
     max_thumbnails : int
-        Maximum number of thumbnail images to embed (default: 100).
-        Set to 0 to disable image embedding.
+        Maximum number of rows to include in the viewer (default: 500).
+    embed_images : bool
+        If True, embed images as base64 (portable but large files).
+        If False (default), use file:// URLs (fast, requires images to stay in place).
 
     Returns
     -------
@@ -766,7 +781,7 @@ def create_dashboard(
 
     # Create ONE browsable viewer with slider for all frames
     # This replaces the per-frame viewers - much more efficient
-    n_rows = len(df)
+    n_rows = min(len(df), max_thumbnails)
     browsable_viewer_html = ""
 
     if image_resolver is not None:
@@ -778,9 +793,10 @@ def create_dashboard(
                 panels=None,  # Auto-detect
                 width=1100,
                 height=700,
-                max_rows=n_rows,  # Include all rows
+                max_rows=n_rows,
                 sidecar=sidecar,
                 normalize_scalars=True,
+                embed_images=embed_images,
             )
 
             # Convert to HTML
