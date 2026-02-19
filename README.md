@@ -18,7 +18,7 @@ pip install viz2psy
 Or from source:
 
 ```bash
-git clone https://github.com/jhutchin/viz2psy.git
+git clone https://github.com/hulacon/viz2psy.git
 cd viz2psy
 pip install -e .
 ```
