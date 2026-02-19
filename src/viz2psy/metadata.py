@@ -15,6 +15,13 @@ from typing import Any
 
 def get_version() -> str:
     """Get viz2psy package version."""
+    # Prefer __version__ from package (always up-to-date in editable installs)
+    try:
+        from viz2psy import __version__
+        return __version__
+    except Exception:
+        pass
+    # Fall back to importlib.metadata
     try:
         from importlib.metadata import version
         return version("viz2psy")

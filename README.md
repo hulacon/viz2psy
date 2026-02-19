@@ -44,6 +44,20 @@ model = ResMemModel()
 df = score_images(model, ["photo1.jpg", "photo2.jpg"])
 ```
 
+## Example Outputs
+
+### Image Analysis
+
+| Emotions (EmoNet) | Object Detection (YOLO) | Saliency Map |
+|:-----------------:|:-----------------------:|:------------:|
+| ![Emotions](docs/images/image_emonet.png) | ![Objects](docs/images/image_objects.png) | ![Saliency](docs/images/image_saliency.png) |
+
+### Video/Timeseries Analysis
+
+| Scene Categories (Places) | Semantic Clustering (CLIP) | Captions (BLIP) |
+|:-------------------------:|:--------------------------:|:---------------:|
+| ![Places Timeseries](docs/images/movie_places_timeseries.png) | ![CLIP MDS](docs/images/movie_clip_mds_2d.png) | ![Caption](docs/images/movie_caption.png) |
+
 ## Documentation
 
 | Document | Description |

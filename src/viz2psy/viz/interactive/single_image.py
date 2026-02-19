@@ -45,6 +45,48 @@ EMOTION_FEATURES = [
 
 SCALAR_FEATURES = ["memorability", "aesthetics"]
 
+
+def _wrap_caption(text: str, max_chars: int = 50) -> str:
+    """Wrap caption text with <br> tags for display in panels.
+
+    Parameters
+    ----------
+    text : str
+        The caption text to wrap.
+    max_chars : int
+        Maximum characters per line before wrapping.
+
+    Returns
+    -------
+    str
+        Caption with <br> tags inserted at word boundaries.
+    """
+    if len(text) <= max_chars:
+        return text
+
+    words = text.split()
+    lines = []
+    current_line = []
+    current_length = 0
+
+    for word in words:
+        word_len = len(word)
+        # +1 for space between words
+        if current_length + word_len + (1 if current_line else 0) <= max_chars:
+            current_line.append(word)
+            current_length += word_len + (1 if len(current_line) > 1 else 0)
+        else:
+            if current_line:
+                lines.append(" ".join(current_line))
+            current_line = [word]
+            current_length = word_len
+
+    if current_line:
+        lines.append(" ".join(current_line))
+
+    return "<br>".join(lines)
+
+
 def _render_saliency_to_image(
     grid: np.ndarray,
     target_width: int = 400,
@@ -1106,14 +1148,15 @@ def _add_feature_panel_with_config(
 
     elif panel_type == "caption" and "caption" in available:
         caption_text = str(data_row.get("caption", ""))
+        wrapped_caption = _wrap_caption(caption_text, max_chars=45)
 
         # Display caption as centered text
         fig.add_trace(go.Scatter(
             x=[0.5],
             y=[0.5],
             mode="text",
-            text=[f"<b>Caption:</b><br><br><i>{caption_text}</i>"],
-            textfont=dict(size=16, color="#333"),
+            text=[f"<b>Caption:</b><br><br><i>{wrapped_caption}</i>"],
+            textfont=dict(size=14, color="#333"),
             textposition="middle center",
             hoverinfo="skip",
             showlegend=False,
@@ -1719,12 +1762,13 @@ def _create_panel_trace(panel_type: str, feature_data: dict, visible: bool | Non
             )
     elif panel_type == "caption":
         caption_text = feature_data.get("caption", "")
+        wrapped_caption = _wrap_caption(caption_text, max_chars=45)
         trace = go.Scatter(
             x=[0.5],
             y=[0.5],
             mode="text",
-            text=[f"<b>Caption:</b><br><br><i>{caption_text}</i>"],
-            textfont=dict(size=16, color="#333"),
+            text=[f"<b>Caption:</b><br><br><i>{wrapped_caption}</i>"],
+            textfont=dict(size=14, color="#333"),
             textposition="middle center",
             hoverinfo="skip",
             showlegend=False,

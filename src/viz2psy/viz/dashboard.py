@@ -1388,9 +1388,19 @@ def _build_dashboard_html(
                 ...layoutData,
                 width: {width},
                 height: {height},
-                margin: {{ t: 50, r: 50, b: 50, l: 60 }},
+                margin: {{ t: 50, r: 50, b: 60, l: 60 }},
                 hovermode: 'closest',
             }};
+
+            // Apply axis titles
+            if (layoutData.xaxis_title) {{
+                layout.xaxis = layout.xaxis || {{}};
+                layout.xaxis.title = layoutData.xaxis_title;
+            }}
+            if (layoutData.yaxis_title) {{
+                layout.yaxis = layout.yaxis || {{}};
+                layout.yaxis.title = layoutData.yaxis_title;
+            }}
 
             // Handle 3D layout
             if (vizKey === 'clustering_3d') {{
