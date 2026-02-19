@@ -7,6 +7,11 @@ build/
 *.pt
 *.pth
 .claude/
+.DS_Store
+
+# Environment files
+.env
+.env.*
 
 # Local test data
 data/
