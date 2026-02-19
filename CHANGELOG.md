@@ -44,6 +44,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `docs/visualization.md` - Visualization guide
   - `docs/api.md` - Python API reference
 
+## v0.4.0 (2026-02-19)
+
+### Feat
+
+- **cli**: add --parallel flag for concurrent model execution
+- add BLIP captioning model and auto-generate HTML visualizations
+
+### Perf
+
+- **viz**: use file:// URLs for images instead of base64 embedding
+
 ## v0.3.0 (2026-02-18)
 
 ### Feat
