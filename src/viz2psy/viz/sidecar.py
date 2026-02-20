@@ -458,6 +458,7 @@ class UnifiedImageResolver:
         self._sidecar_paths = None  # For image_folder
         self._sidecar_video_path = None
         self._sidecar_saved_frames_dir = None
+        self._sidecar_frame_format = None
         self._sidecar_hdf5_path = None
         self._sidecar_hdf5_dataset = None
         self._sidecar_hdf5_indices = None
@@ -477,6 +478,7 @@ class UnifiedImageResolver:
                 saved_frames = input_info.get("saved_frames_dir")
                 if saved_frames:
                     self._sidecar_saved_frames_dir = Path(saved_frames)
+                self._sidecar_frame_format = input_info.get("saved_frames_format")
 
             elif self.input_type == "hdf5_brick":
                 path = input_info.get("path")
@@ -583,10 +585,15 @@ class UnifiedImageResolver:
         # Check for saved frames first (CLI override or sidecar)
         frames_dir = self.frames_dir or self._sidecar_saved_frames_dir
         if frames_dir and frames_dir.exists():
-            # Frame naming convention: frame_{time:.3f}.png
-            frame_path = frames_dir / f"frame_{timestamp:.3f}.png"
+            fmt = self._sidecar_frame_format or "png"  # backward compat
+            frame_path = frames_dir / f"frame_{timestamp:.3f}.{fmt}"
             if frame_path.exists():
                 return frame_path
+            # Fallback: try the other format
+            alt = "png" if fmt == "jpg" else "jpg"
+            alt_path = frames_dir / f"frame_{timestamp:.3f}.{alt}"
+            if alt_path.exists():
+                return alt_path
 
         # Fall back to extracting from video
         video_path = self.video_path or self._sidecar_video_path

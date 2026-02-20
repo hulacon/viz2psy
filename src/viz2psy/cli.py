@@ -500,6 +500,7 @@ def _process_video(
     quiet: bool,
     metadata=None,
     parallel: bool = False,
+    frame_format: str = "jpg",
 ):
     """Process a video file and return a DataFrame with time-based scores."""
     from viz2psy.pipeline import score_images
@@ -529,7 +530,8 @@ def _process_video(
 
     # Set metadata input info
     if metadata:
-        metadata.set_input_video(video_path, frame_interval, n_frames, save_frames)
+        metadata.set_input_video(video_path, frame_interval, n_frames, save_frames,
+                                frame_format=frame_format)
 
     # For parallel mode, we need frames on disk
     use_temp_dir = False
@@ -543,6 +545,7 @@ def _process_video(
             frame_interval=frame_interval,
             save_dir=save_frames,
             quiet=quiet,
+            frame_format=frame_format,
         )
     elif parallel and len(models) > 1:
         # Parallel mode requires frames on disk
@@ -552,6 +555,7 @@ def _process_video(
             video_path,
             frame_interval=frame_interval,
             quiet=quiet,
+            frame_format=frame_format,
         )
         use_temp_dir = True
     elif estimated_mem > available_mem * 0.8:
@@ -564,6 +568,7 @@ def _process_video(
             video_path,
             frame_interval=frame_interval,
             quiet=quiet,
+            frame_format=frame_format,
         )
         use_temp_dir = True
     else:
@@ -929,6 +934,12 @@ def main():
         action="store_true",
         help="Do not save video frames to disk. Frames will be extracted on-the-fly for visualization.",
     )
+    parser.add_argument(
+        "--frame-format",
+        choices=["jpg", "png"],
+        default="jpg",
+        help="Image format for saved video frames (default: jpg). JPEG is ~7x smaller than PNG.",
+    )
     # HDF5-specific options
     parser.add_argument(
         "--dataset", "-d",
@@ -1095,11 +1106,14 @@ def main():
                 quiet=args.quiet,
                 metadata=metadata,
                 parallel=args.parallel,
+                frame_format=args.frame_format,
             )
         else:
             # Image processing
             if args.save_frames or args.no_save_frames:
                 print("Warning: --save-frames/--no-save-frames are only used with video input.", file=sys.stderr)
+            if args.frame_format != "jpg":
+                print("Warning: --frame-format is only used with video input.", file=sys.stderr)
             if args.frame_interval != 0.5:
                 print("Warning: --frame-interval is only used with video input.", file=sys.stderr)
             if args.dataset:

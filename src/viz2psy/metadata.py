@@ -177,6 +177,7 @@ class MetadataBuilder:
         frame_interval: float,
         n_frames: int,
         saved_frames_dir: Path | None = None,
+        frame_format: str = "jpg",
     ):
         """Set input info for video file."""
         self.input_info = {
@@ -187,6 +188,7 @@ class MetadataBuilder:
         }
         if saved_frames_dir is not None:
             self.input_info["saved_frames_dir"] = str(saved_frames_dir.resolve())
+            self.input_info["saved_frames_format"] = frame_format
         self.index_column = "time"
 
     def set_output(self, path: Path, rows: int, columns: int):

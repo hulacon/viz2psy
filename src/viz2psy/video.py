@@ -74,6 +74,7 @@ def extract_frames(
     frame_interval: float = 0.5,
     save_dir: Path | None = None,
     quiet: bool = False,
+    frame_format: str = "jpg",
 ) -> list[tuple[float, Image.Image | Path]]:
     """Extract frames from a video at specified time intervals.
 
@@ -88,6 +89,8 @@ def extract_frames(
         PIL Images. Useful for large videos to avoid memory issues.
     quiet : bool
         Suppress progress output.
+    frame_format : str
+        Image format for saved frames: ``"jpg"`` (default) or ``"png"``.
 
     Returns
     -------
@@ -137,8 +140,10 @@ def extract_frames(
             pil_image = Image.fromarray(frame_rgb)
 
             if save_dir:
-                frame_path = save_dir / f"frame_{t:.3f}.png"
-                pil_image.save(frame_path)
+                ext = "jpg" if frame_format == "jpg" else "png"
+                frame_path = save_dir / f"frame_{t:.3f}.{ext}"
+                save_kwargs = {"quality": 85} if ext == "jpg" else {}
+                pil_image.save(frame_path, **save_kwargs)
                 frames.append((t, frame_path))
             else:
                 frames.append((t, pil_image))
@@ -153,6 +158,7 @@ def extract_frames_to_temp(
     video_path: Path,
     frame_interval: float = 0.5,
     quiet: bool = False,
+    frame_format: str = "jpg",
 ) -> tuple[list[tuple[float, Path]], tempfile.TemporaryDirectory]:
     """Extract frames to a temporary directory.
 
@@ -167,6 +173,8 @@ def extract_frames_to_temp(
         Time between frames in seconds.
     quiet : bool
         Suppress progress output.
+    frame_format : str
+        Image format for saved frames: ``"jpg"`` (default) or ``"png"``.
 
     Returns
     -------
@@ -180,5 +188,6 @@ def extract_frames_to_temp(
         frame_interval=frame_interval,
         save_dir=Path(temp_dir.name),
         quiet=quiet,
+        frame_format=frame_format,
     )
     return frames, temp_dir
