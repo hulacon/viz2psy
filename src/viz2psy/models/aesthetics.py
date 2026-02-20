@@ -54,8 +54,8 @@ class AestheticsModel(BaseModel):
 
     name = "aesthetics"
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, device: str | None = None):
+        super().__init__(device=device)
         self._clip_model = None
         self._preprocess = None
         self._head = None

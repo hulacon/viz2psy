@@ -22,8 +22,9 @@ class CLIPModel(BaseModel):
         self,
         model_name: str = _DEFAULT_MODEL_NAME,
         pretrained: str = _DEFAULT_PRETRAINED,
+        device: str | None = None,
     ):
-        super().__init__()
+        super().__init__(device=device)
         self.model_name = model_name
         self.pretrained = pretrained
         self._preprocess = None

@@ -50,8 +50,9 @@ class YOLOModel(BaseModel):
         model_name: str = _DEFAULT_MODEL,
         conf: float = _DEFAULT_CONF,
         iou: float = _DEFAULT_IOU,
+        device: str | None = None,
     ):
-        super().__init__()
+        super().__init__(device=device)
         self.model_name = model_name
         self.conf = conf
         self.iou = iou

@@ -116,8 +116,8 @@ class EmoNetModel(BaseModel):
 
     name = "emonet"
 
-    def __init__(self, weights_path: Path | str | None = None):
-        super().__init__()
+    def __init__(self, weights_path: Path | str | None = None, device: str | None = None):
+        super().__init__(device=device)
         self.weights_path = Path(weights_path) if weights_path else _DEFAULT_WEIGHTS_PATH
 
     def load(self) -> None:

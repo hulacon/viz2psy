@@ -79,8 +79,9 @@ class GISTModel(BaseModel):
         grid_size: int = _DEFAULT_GRID_SIZE,
         frequencies: tuple[float, ...] | None = None,
         image_size: int = 256,
+        device: str | None = None,
     ):
-        super().__init__()
+        super().__init__(device=device)
         self.n_orientations = n_orientations
         self.n_scales = n_scales
         self.grid_size = grid_size

@@ -119,8 +119,8 @@ class PlacesModel(BaseModel):
 
     name = "places"
 
-    def __init__(self, cache_dir: Path | None = None):
-        super().__init__()
+    def __init__(self, cache_dir: Path | None = None, device: str | None = None):
+        super().__init__(device=device)
         self._cache_dir = cache_dir
         self._categories: list[str] = []
         self._attributes: list[str] = []

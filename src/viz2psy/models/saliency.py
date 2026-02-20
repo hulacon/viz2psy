@@ -26,8 +26,8 @@ class SaliencyModel(BaseModel):
 
     name = "saliency"
 
-    def __init__(self, grid_size: int = _DEFAULT_GRID_SIZE):
-        super().__init__()
+    def __init__(self, grid_size: int = _DEFAULT_GRID_SIZE, device: str | None = None):
+        super().__init__(device=device)
         self.grid_size = grid_size
         self._centerbias: np.ndarray | None = None
 
