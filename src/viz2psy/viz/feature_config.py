@@ -53,8 +53,8 @@ FEATURE_CONFIGS: dict[str, FeatureConfig] = {
         mds_clustering=False,
         trajectories=False,
         timeseries_mode="all",
-        column_patterns=["memorability"],
-        scalar_features=["memorability"],
+        column_patterns=["resmem_memorability"],
+        scalar_features=["resmem_memorability"],
     ),
     "aesthetics": FeatureConfig(
         name="aesthetics",
@@ -65,8 +65,8 @@ FEATURE_CONFIGS: dict[str, FeatureConfig] = {
         mds_clustering=False,
         trajectories=False,
         timeseries_mode="all",
-        column_patterns=["aesthetic*"],
-        scalar_features=["aesthetic_score"],
+        column_patterns=["aesthetics_score"],
+        scalar_features=["aesthetics_score"],
     ),
     "emonet": FeatureConfig(
         name="emonet",
@@ -78,20 +78,16 @@ FEATURE_CONFIGS: dict[str, FeatureConfig] = {
         trajectories=True,
         timeseries_mode="top_k",
         top_k=5,
-        # Emonet columns are direct emotion names (no prefix)
-        column_patterns=[
-            "Adoration", "Aesthetic Appreciation", "Amusement", "Anxiety",
-            "Awe", "Boredom", "Confusion", "Craving", "Disgust",
-            "Empathic Pain", "Entrancement", "Excitement", "Fear",
-            "Horror", "Interest", "Joy", "Romance", "Sadness",
-            "Sexual Desire", "Surprise",
-        ],
+        # Emonet columns carry the emonet_ prefix
+        column_patterns=["emonet_*"],
         scalar_features=[
-            "Adoration", "Aesthetic Appreciation", "Amusement", "Anxiety",
-            "Awe", "Boredom", "Confusion", "Craving", "Disgust",
-            "Empathic Pain", "Entrancement", "Excitement", "Fear",
-            "Horror", "Interest", "Joy", "Romance", "Sadness",
-            "Sexual Desire", "Surprise",
+            "emonet_adoration", "emonet_aesthetic_appreciation",
+            "emonet_amusement", "emonet_anxiety", "emonet_awe",
+            "emonet_boredom", "emonet_confusion", "emonet_craving",
+            "emonet_disgust", "emonet_empathic_pain", "emonet_entrancement",
+            "emonet_excitement", "emonet_fear", "emonet_horror",
+            "emonet_interest", "emonet_joy", "emonet_romance",
+            "emonet_sadness", "emonet_sexual_desire", "emonet_surprise",
         ],
     ),
     "llstat": FeatureConfig(
@@ -103,23 +99,18 @@ FEATURE_CONFIGS: dict[str, FeatureConfig] = {
         mds_clustering=True,
         trajectories=True,
         timeseries_mode="all",
-        # llstat columns use various naming patterns (no llstat_ prefix)
-        column_patterns=[
-            "luminance_*", "rms_contrast",
-            "r_mean", "r_std", "g_mean", "g_std", "b_mean", "b_std",
-            "lab_l_mean", "lab_a_mean", "lab_b_mean",
-            "saturation_mean", "hf_energy", "lf_energy",
-            "edge_density", "colorfulness",
-        ],
+        # llstat columns carry the llstat_ prefix
+        column_patterns=["llstat_*"],
         scalar_features=[
-            "luminance_mean", "luminance_std",
-            "rms_contrast",
-            "r_mean", "r_std", "g_mean", "g_std", "b_mean", "b_std",
-            "lab_l_mean", "lab_a_mean", "lab_b_mean",
-            "saturation_mean",
-            "hf_energy", "lf_energy",
-            "edge_density",
-            "colorfulness",
+            "llstat_luminance_mean", "llstat_luminance_std",
+            "llstat_rms_contrast",
+            "llstat_r_mean", "llstat_r_std", "llstat_g_mean", "llstat_g_std",
+            "llstat_b_mean", "llstat_b_std",
+            "llstat_lab_l_mean", "llstat_lab_a_mean", "llstat_lab_b_mean",
+            "llstat_saturation_mean",
+            "llstat_hf_energy", "llstat_lf_energy",
+            "llstat_edge_density",
+            "llstat_colorfulness",
         ],
     ),
     "places": FeatureConfig(
@@ -145,15 +136,11 @@ FEATURE_CONFIGS: dict[str, FeatureConfig] = {
         trajectories=True,
         timeseries_mode="top_k",
         top_k=10,
-        # yolo_ prefix for object classes, plus summary stats
-        column_patterns=[
-            "yolo_*",
-            "object_count", "category_count", "object_coverage",
-            "largest_object_ratio", "mean_confidence",
-        ],
+        # yolo_ prefix for object classes and summary stats
+        column_patterns=["yolo_*"],
         scalar_features=[
-            "object_count", "category_count", "object_coverage",
-            "largest_object_ratio", "mean_confidence",
+            "yolo_object_count", "yolo_category_count", "yolo_object_coverage",
+            "yolo_largest_object_ratio", "yolo_mean_confidence",
         ],
     ),
     "clip": FeatureConfig(
@@ -337,7 +324,7 @@ def get_visualization_recommendations(df_columns: list[str]) -> dict:
 VISUALIZATION_MATRIX = """
 Model        | Timeseries | MDS/Cluster | Trajectories | Notes
 -------------|------------|-------------|--------------|-------------------------------
-resmem       | Yes        | No          | No           | Single scalar (memorability)
+resmem       | Yes        | No          | No           | Single scalar (resmem_memorability)
 aesthetics   | Yes        | No          | No           | Single scalar (1-10)
 emonet       | Top-5      | Yes         | Yes          | 20 emotions, emotional state evolution
 llstat       | Yes        | Yes         | Yes          | 17 interpretable visual stats

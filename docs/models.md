@@ -26,7 +26,7 @@ viz2psy provides wrappers for 11 computational models covering memorability, emo
 
 Predicts how memorable an image is to human observers.
 
-- **Output**: Single `memorability` score (0-1)
+- **Output**: Single `resmem_memorability` score (0-1)
 - **Model**: ResMem CNN trained on LaMem dataset
 - **Reference**: Needell, C. D., & Bainbridge, W. A. (2022). Embracing new techniques in deep learning for estimating image memorability. *Computational Brain & Behavior*.
 
@@ -43,8 +43,8 @@ model = ResMemModel()
 
 Predicts emotion category probabilities for images.
 
-- **Output**: 20 emotion probabilities (sum to 1)
-- **Categories**: Adoration, Aesthetic Appreciation, Amusement, Anxiety, Awe, Boredom, Confusion, Craving, Disgust, Empathic Pain, Entrancement, Excitement, Fear, Horror, Interest, Joy, Romance, Sadness, Sexual Desire, Surprise
+- **Output**: 20 emotion probabilities (`emonet_adoration` to `emonet_surprise`, sum to 1)
+- **Categories**: Adoration, Aesthetic Appreciation, Amusement, Anxiety, Awe, Boredom, Confusion, Craving, Disgust, Empathic Pain, Entrancement, Excitement, Fear, Horror, Interest, Joy, Romance, Sadness, Sexual Desire, Surprise (columns are lowercase with the `emonet_` prefix, e.g. `emonet_empathic_pain`)
 - **Model**: EmoNet CNN trained on emotion-labeled images
 - **Reference**: Kragel, P. A., et al. (2019). Emotion schemas are embedded in the human visual system. *Science Advances*.
 
@@ -79,7 +79,7 @@ model = CLIPModel()
 
 Generates natural language captions describing image content using BLIP.
 
-- **Output**: Single `caption` string column
+- **Output**: Single `caption_text` string column
 - **Model**: Salesforce BLIP (large by default)
 - **Use cases**: Image description, accessibility, content understanding, metadata
 - **Reference**: Li, J., et al. (2022). BLIP: Bootstrapping Language-Image Pre-training for Unified Vision-Language Understanding and Generation. *ICML*.
@@ -96,7 +96,7 @@ model = CaptionModel(model_name="Salesforce/blip-image-captioning-base")
 
 Example output:
 ```
-caption
+caption_text
 "a man playing tennis on a tennis court"
 "a sunset over the ocean with palm trees"
 "a close up of a red flower with water droplets"
@@ -160,14 +160,14 @@ model = PlacesModel()
 Computes low-level image statistics.
 
 - **Output**: 17 statistics including:
-  - `luminance_mean`, `luminance_std` - Brightness
-  - `rms_contrast` - Root-mean-square contrast
-  - `r_mean`, `r_std`, `g_mean`, `g_std`, `b_mean`, `b_std` - RGB channel stats
-  - `lab_l_mean`, `lab_a_mean`, `lab_b_mean` - CIELAB color space
-  - `saturation_mean` - Color saturation
-  - `hf_energy`, `lf_energy` - High/low frequency energy (FFT)
-  - `edge_density` - Canny edge density
-  - `colorfulness` - Hasler & Süsstrunk metric
+  - `llstat_luminance_mean`, `llstat_luminance_std` - Brightness
+  - `llstat_rms_contrast` - Root-mean-square contrast
+  - `llstat_r_mean`, `llstat_r_std`, `llstat_g_mean`, `llstat_g_std`, `llstat_b_mean`, `llstat_b_std` - RGB channel stats
+  - `llstat_lab_l_mean`, `llstat_lab_a_mean`, `llstat_lab_b_mean` - CIELAB color space
+  - `llstat_saturation_mean` - Color saturation
+  - `llstat_hf_energy`, `llstat_lf_energy` - High/low frequency energy (FFT)
+  - `llstat_edge_density` - Canny edge density
+  - `llstat_colorfulness` - Hasler & Süsstrunk metric
 
 ```python
 from viz2psy.models.llstat import LowLevelStatModel
@@ -202,7 +202,7 @@ model = SaliencyModel()
 
 Predicts aesthetic quality using the LAION Aesthetics model.
 
-- **Output**: Single `aesthetic_score` (1-10 scale)
+- **Output**: Single `aesthetics_score` (1-10 scale)
 - **Model**: CLIP-based aesthetic predictor trained on human ratings
 - **Reference**: Schuhmann, C., et al. (2022). LAION-5B: An open large-scale dataset for training next generation image-text models. *NeurIPS*.
 
@@ -221,11 +221,11 @@ Detects and counts objects using YOLOv8.
 
 - **Output**: 85 values including:
   - 80 object class counts (`yolo_person`, `yolo_car`, etc.)
-  - `object_count` - Total objects detected
-  - `category_count` - Unique categories present
-  - `object_coverage` - Fraction of image covered by detections
-  - `largest_object_ratio` - Size of largest object relative to image
-  - `mean_confidence` - Average detection confidence
+  - `yolo_object_count` - Total objects detected
+  - `yolo_category_count` - Unique categories present
+  - `yolo_object_coverage` - Fraction of image covered by detections
+  - `yolo_largest_object_ratio` - Size of largest object relative to image
+  - `yolo_mean_confidence` - Average detection confidence
 - **Model**: YOLOv8n (nano)
 - **Classes**: COCO 80-class object categories
 

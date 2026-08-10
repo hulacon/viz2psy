@@ -14,6 +14,7 @@ class ResMemModel(BaseModel):
     """
 
     name = "resmem"
+    checkpoint = "resmem-pretrained"
 
     def load(self) -> None:
         self.model = ResMem(pretrained=True)
@@ -24,11 +25,11 @@ class ResMemModel(BaseModel):
         x = transformer(image).unsqueeze(0).to(self.device)
         with torch.no_grad():
             score = self.model(x).item()
-        return {"memorability": score}
+        return {"resmem_memorability": score}
 
     def predict_batch(self, images: list[Image.Image]) -> list[dict[str, float]]:
         tensors = [transformer(img) for img in images]
         batch = torch.stack(tensors).to(self.device)
         with torch.no_grad():
             scores = self.model(batch).squeeze(1).tolist()
-        return [{"memorability": s} for s in scores]
+        return [{"resmem_memorability": s} for s in scores]

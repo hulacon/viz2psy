@@ -118,6 +118,8 @@ class PlacesModel(BaseModel):
     """
 
     name = "places"
+    checkpoint = "wideresnet18_places365"
+    extra_prefixes = ("sunattr",)
 
     def __init__(self, cache_dir: Path | None = None, device: str | None = None):
         super().__init__(device=device)

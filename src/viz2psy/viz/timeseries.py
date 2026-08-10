@@ -27,7 +27,7 @@ def get_feature_columns(
     ----------
     df : pd.DataFrame
     patterns : list of str, optional
-        Glob patterns to match (e.g., ["memorability", "clip_*"]).
+        Glob patterns to match (e.g., ["resmem_memorability", "clip_*"]).
         If None, returns all numeric columns except common ID columns.
     exclude : list of str, optional
         Columns to exclude.
@@ -36,7 +36,7 @@ def get_feature_columns(
     -------
     list of str
     """
-    exclude = exclude or ["time", "index", "filename", "filepath", "image_idx"]
+    exclude = exclude or ["time", "index", "filename", "filepath", "image_idx", "stimulus_id"]
 
     if patterns is None:
         # All numeric columns except excluded

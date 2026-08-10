@@ -32,19 +32,26 @@ if TYPE_CHECKING:
     from .sidecar import SidecarMetadata, UnifiedImageResolver
 
 
-# Emotion feature names (EmoNet)
+# Emotion feature columns (EmoNet)
 EMOTION_FEATURES = [
-    "Adoration", "Aesthetic Appreciation", "Amusement", "Anxiety", "Awe",
-    "Boredom", "Confusion", "Craving", "Disgust", "Empathic Pain",
-    "Entrancement", "Excitement", "Fear", "Horror", "Interest",
-    "Joy", "Romance", "Sadness", "Sexual Desire", "Surprise"
+    "emonet_adoration", "emonet_aesthetic_appreciation", "emonet_amusement",
+    "emonet_anxiety", "emonet_awe", "emonet_boredom", "emonet_confusion",
+    "emonet_craving", "emonet_disgust", "emonet_empathic_pain",
+    "emonet_entrancement", "emonet_excitement", "emonet_fear",
+    "emonet_horror", "emonet_interest", "emonet_joy", "emonet_romance",
+    "emonet_sadness", "emonet_sexual_desire", "emonet_surprise"
 ]
 
-# Scalar features with known ranges for normalization
+# Scalar feature columns with known ranges for normalization
 SCALAR_FEATURES = {
-    "memorability": (0, 1),
-    "aesthetic_score": (0, 10),
+    "resmem_memorability": (0, 1),
+    "aesthetics_score": (0, 10),
 }
+
+
+def _emotion_label(column: str) -> str:
+    """Human-readable label for an emonet column (e.g. "Empathic Pain")."""
+    return column.removeprefix("emonet_").replace("_", " ").title()
 
 
 def _image_to_base64(img: "Image.Image | Path | None", max_size: int = 200) -> str | None:
@@ -102,7 +109,7 @@ def _extract_row_details(
     emotions = {}
     for em in EMOTION_FEATURES:
         if em in row.index:
-            emotions[em] = float(row[em]) if pd.notna(row[em]) else 0
+            emotions[_emotion_label(em)] = float(row[em]) if pd.notna(row[em]) else 0
     if emotions:
         details["emotions"] = emotions
 
@@ -149,7 +156,7 @@ def _generate_single_image_viewer_html(
     emotions_data = []
     for em in EMOTION_FEATURES:
         if em in row.index and pd.notna(row[em]):
-            emotions_data.append({"name": em, "value": float(row[em])})
+            emotions_data.append({"name": _emotion_label(em), "value": float(row[em])})
     emotions_data.sort(key=lambda x: x["value"], reverse=True)
 
     # Extract scalars

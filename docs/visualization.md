@@ -9,7 +9,7 @@ viz2psy includes `viz2psy-viz`, a CLI tool for visualizing feature outputs with 
 viz2psy-viz wordcloud scores.csv -o cloud.png
 
 # Interactive timeseries
-viz2psy-viz timeseries scores.csv --features memorability -i -o plot.html
+viz2psy-viz timeseries scores.csv --features resmem_memorability -i -o plot.html
 
 # Scatter projection of embeddings
 viz2psy-viz scatter scores.csv --features "clip_*" -o scatter.png
@@ -47,13 +47,13 @@ Plot feature values over time (for video frames or sequential data).
 
 ```bash
 # Static plot
-viz2psy-viz timeseries scores.csv --features memorability aesthetics -o plot.png
+viz2psy-viz timeseries scores.csv --features resmem_memorability aesthetics_score -o plot.png
 
 # Interactive with zoom/pan
-viz2psy-viz timeseries scores.csv --features memorability -i -o plot.html
+viz2psy-viz timeseries scores.csv --features resmem_memorability -i -o plot.html
 
 # Normalize for comparison
-viz2psy-viz timeseries scores.csv --features memorability aesthetics -i --normalize -o plot.html
+viz2psy-viz timeseries scores.csv --features resmem_memorability aesthetics_score -i --normalize -o plot.html
 ```
 
 Options:
@@ -68,7 +68,7 @@ Correlation heatmap between features.
 
 ```bash
 viz2psy-viz heatmap scores.csv -o heatmap.png
-viz2psy-viz heatmap scores.csv --features memorability aesthetics Awe Joy --method spearman -o heatmap.png
+viz2psy-viz heatmap scores.csv --features resmem_memorability aesthetics_score emonet_awe emonet_joy --method spearman -o heatmap.png
 ```
 
 Options:
@@ -84,7 +84,7 @@ Options:
 viz2psy-viz scatter scores.csv --features "clip_*" -o scatter.png
 
 # Interactive UMAP colored by memorability
-viz2psy-viz scatter scores.csv --features "clip_*" --method umap --color-by memorability -i -o scatter.html
+viz2psy-viz scatter scores.csv --features "clip_*" --method umap --color-by resmem_memorability -i -o scatter.html
 
 # MDS projection
 viz2psy-viz scatter scores.csv --features "emonet_*" --method mds -i -o mds.html
@@ -126,7 +126,7 @@ Linked scatter + timeseries dashboard for interactive exploration.
 ```bash
 viz2psy-viz explorer scores.csv \
     --scatter-features "clip_*" \
-    --timeseries-features memorability Awe \
+    --timeseries-features resmem_memorability emonet_awe \
     -o explorer.html
 ```
 
@@ -214,7 +214,7 @@ The `image` command supports multiple visualization panels accessible via dropdo
 |-------|-------------|----------|
 | `emotions_bar` | Horizontal bar chart of emotion probabilities | emonet |
 | `emotions_spider` | Radar plot of emotion profile | emonet |
-| `scalars` | Bar chart of scalar features (memorability, etc.) | Any scalar |
+| `scalars` | Bar chart of scalar features (resmem_memorability, etc.) | Any scalar |
 | `saliency` | Fixation density heatmap | saliency |
 | `yolo` | Top detected objects | yolo |
 | `places` | Top scene predictions | places |
@@ -237,7 +237,7 @@ Interactive HTML files are standalone and can be shared/viewed in any browser.
 
 When a CSV has an accompanying `.meta.json` sidecar file (created by `viz2psy`), visualizations use it for:
 
-- **Semantic labels**: Display "Adoration" instead of column names
+- **Semantic labels**: Display "Adoration" instead of "emonet_adoration"
 - **Input type detection**: Auto-detect video/HDF5/image folder
 - **Path resolution**: Find images relative to original input path
 

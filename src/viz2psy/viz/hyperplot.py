@@ -23,7 +23,7 @@ def get_feature_columns(
     exclude: list[str] | None = None,
 ) -> list[str]:
     """Get feature columns matching patterns."""
-    exclude = exclude or ["time", "index", "filename", "filepath", "image_idx"]
+    exclude = exclude or ["time", "index", "filename", "filepath", "image_idx", "stimulus_id"]
 
     if patterns is None:
         numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()

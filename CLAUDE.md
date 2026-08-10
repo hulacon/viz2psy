@@ -218,7 +218,7 @@ When output is saved to file (`-o`), a `.meta.json` sidecar is created with:
     "clip": { "pattern": "clip_{NNN}", "range": [0, 511], "count": 512 },
     "emonet": { "columns": [...], "definition": "feature_definitions.emonet" }
   },
-  "feature_definitions": { "emonet": ["Adoration", ...] }
+  "feature_definitions": { "emonet": ["emonet_adoration", ...] }
 }
 ```
 

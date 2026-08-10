@@ -35,15 +35,22 @@ if TYPE_CHECKING:
     from ..sidecar import SidecarMetadata
 
 
-# Known feature groups
+# Known feature groups (CSV column names)
 EMOTION_FEATURES = [
-    "Adoration", "Aesthetic Appreciation", "Amusement", "Anxiety", "Awe",
-    "Boredom", "Confusion", "Craving", "Disgust", "Empathic Pain",
-    "Entrancement", "Excitement", "Fear", "Horror", "Interest",
-    "Joy", "Romance", "Sadness", "Sexual Desire", "Surprise"
+    "emonet_adoration", "emonet_aesthetic_appreciation", "emonet_amusement",
+    "emonet_anxiety", "emonet_awe", "emonet_boredom", "emonet_confusion",
+    "emonet_craving", "emonet_disgust", "emonet_empathic_pain",
+    "emonet_entrancement", "emonet_excitement", "emonet_fear",
+    "emonet_horror", "emonet_interest", "emonet_joy", "emonet_romance",
+    "emonet_sadness", "emonet_sexual_desire", "emonet_surprise"
 ]
 
-SCALAR_FEATURES = ["memorability", "aesthetics"]
+SCALAR_FEATURES = ["resmem_memorability", "aesthetics_score"]
+
+
+def _emotion_label(column: str) -> str:
+    """Human-readable label for an emonet column (e.g. "Empathic Pain")."""
+    return column.removeprefix("emonet_").replace("_", " ").title()
 
 
 def _wrap_caption(text: str, max_chars: int = 50) -> str:
@@ -211,35 +218,34 @@ def _render_wordcloud_to_base64(
 # Known ranges for normalization (min, max)
 FEATURE_RANGES = {
     # Model outputs (typically 0-1)
-    "memorability": (0, 1),
-    "aesthetic_score": (0, 10),  # LAION aesthetics
-    "aesthetics": (0, 1),
+    "resmem_memorability": (0, 1),
+    "aesthetics_score": (0, 10),  # LAION aesthetics
 
     # Low-level stats
-    "luminance_mean": (0, 255),
-    "luminance_std": (0, 128),
-    "rms_contrast": (0, 1),
-    "r_mean": (0, 255),
-    "r_std": (0, 128),
-    "g_mean": (0, 255),
-    "g_std": (0, 128),
-    "b_mean": (0, 255),
-    "b_std": (0, 128),
-    "lab_l_mean": (0, 100),
-    "lab_a_mean": (-128, 127),
-    "lab_b_mean": (-128, 127),
-    "saturation_mean": (0, 1),
-    "hf_energy": (0, 1),
-    "lf_energy": (0, 1),
-    "edge_density": (0, 1),
-    "colorfulness": (0, 200),
+    "llstat_luminance_mean": (0, 255),
+    "llstat_luminance_std": (0, 128),
+    "llstat_rms_contrast": (0, 1),
+    "llstat_r_mean": (0, 255),
+    "llstat_r_std": (0, 128),
+    "llstat_g_mean": (0, 255),
+    "llstat_g_std": (0, 128),
+    "llstat_b_mean": (0, 255),
+    "llstat_b_std": (0, 128),
+    "llstat_lab_l_mean": (0, 100),
+    "llstat_lab_a_mean": (-128, 127),
+    "llstat_lab_b_mean": (-128, 127),
+    "llstat_saturation_mean": (0, 1),
+    "llstat_hf_energy": (0, 1),
+    "llstat_lf_energy": (0, 1),
+    "llstat_edge_density": (0, 1),
+    "llstat_colorfulness": (0, 200),
 
     # YOLO stats
-    "object_count": (0, 50),
-    "category_count": (0, 20),
-    "object_coverage": (0, 1),
-    "largest_object_ratio": (0, 1),
-    "mean_confidence": (0, 1),
+    "yolo_object_count": (0, 50),
+    "yolo_category_count": (0, 20),
+    "yolo_object_coverage": (0, 1),
+    "yolo_largest_object_ratio": (0, 1),
+    "yolo_mean_confidence": (0, 1),
 }
 
 
@@ -278,8 +284,8 @@ def _get_available_features(row: pd.Series) -> dict[str, list[str]]:
         available["places"] = places_cols
 
     # Check for caption
-    if "caption" in row.index and pd.notna(row["caption"]):
-        available["caption"] = ["caption"]
+    if "caption_text" in row.index and pd.notna(row["caption_text"]):
+        available["caption"] = ["caption_text"]
 
     return available
 
@@ -318,7 +324,7 @@ def plot_emotions_bar(
 
     fig = go.Figure(go.Bar(
         x=values,
-        y=features,
+        y=[_emotion_label(f) for f in features],
         orientation="h",
         marker_color=color,
         hovertemplate="%{y}: %{x:.3f}<extra></extra>",
@@ -371,7 +377,7 @@ def plot_emotions_spider(
 
     fig = go.Figure(go.Scatterpolar(
         r=values,
-        theta=features,
+        theta=[_emotion_label(f) for f in features],
         fill="toself",
         fillcolor=fill_color,
         line=dict(color=line_color),
@@ -843,7 +849,7 @@ def _normalize_scalar(value: float, feature: str) -> tuple[float, str]:
     """
     if feature in FEATURE_RANGES:
         min_val, max_val = FEATURE_RANGES[feature]
-        # Handle features that can be negative (like lab_a_mean)
+        # Handle features that can be negative (like llstat_lab_a_mean)
         normalized = (value - min_val) / (max_val - min_val)
         normalized = max(0, min(1, normalized))  # Clamp to [0, 1]
         tooltip = f"{feature}: {value:.3f} (range: {min_val}-{max_val})"
@@ -890,10 +896,11 @@ def _add_feature_panel_with_config(
         values = [data_row[f] for f in available["emotions"]]
         sorted_pairs = sorted(zip(available["emotions"], values), key=lambda x: x[1], reverse=True)
         features, values = zip(*sorted_pairs)
+        labels = [_emotion_label(f) for f in features]
 
         fig.add_trace(go.Bar(
             x=values,
-            y=features,
+            y=labels,
             orientation="h",
             marker_color="#636EFA",
             hovertemplate="%{y}: %{x:.3f}<extra></extra>",
@@ -913,7 +920,7 @@ def _add_feature_panel_with_config(
             "range": None,
             "type": "category",
             "categoryorder": "array",
-            "categoryarray": list(features),
+            "categoryarray": labels,
             "visible": True,
         })
 
@@ -1147,7 +1154,7 @@ def _add_feature_panel_with_config(
             })
 
     elif panel_type == "caption" and "caption" in available:
-        caption_text = str(data_row.get("caption", ""))
+        caption_text = str(data_row.get("caption_text", ""))
         wrapped_caption = _wrap_caption(caption_text, max_chars=45)
 
         # Display caption as centered text
@@ -1270,7 +1277,7 @@ def view_image_emotions(
         emotions_closed = emotions + [emotions[0]]
         fig.add_trace(go.Scatterpolar(
             r=values_closed,
-            theta=emotions_closed,
+            theta=[_emotion_label(e) for e in emotions_closed],
             fill="toself",
             fillcolor="rgba(99, 110, 250, 0.3)",
             line=dict(color="#636EFA"),
@@ -1281,7 +1288,7 @@ def view_image_emotions(
         emotions_sorted, values_sorted = zip(*sorted_pairs)
         fig.add_trace(go.Bar(
             x=values_sorted,
-            y=emotions_sorted,
+            y=[_emotion_label(e) for e in emotions_sorted],
             orientation="h",
             marker_color="#636EFA",
         ), row=1, col=2)
@@ -1918,6 +1925,7 @@ def _extract_panel_data(
         values = [row[f] for f in available["emotions"]]
         sorted_pairs = sorted(zip(available["emotions"], values), key=lambda x: x[1], reverse=True)
         labels, values = zip(*sorted_pairs) if sorted_pairs else ([], [])
+        labels = [_emotion_label(f) for f in labels]
         data = {"labels": list(labels), "values": list(values), "color": "#636EFA"}
 
     elif panel_type == "scalars":
@@ -1981,7 +1989,7 @@ def _extract_panel_data(
 
     elif panel_type == "emotions_spider" and "emotions" in available:
         values = [row[f] for f in available["emotions"]]
-        labels = list(available["emotions"])
+        labels = [_emotion_label(f) for f in available["emotions"]]
         # Close the polygon
         values = values + [values[0]]
         labels = labels + [labels[0]]
@@ -2000,7 +2008,7 @@ def _extract_panel_data(
             data = {"image_array": None}
 
     elif panel_type == "caption" and "caption" in available:
-        caption_text = str(row.get("caption", ""))
+        caption_text = str(row.get("caption_text", ""))
         data = {"caption": caption_text}
 
     return data

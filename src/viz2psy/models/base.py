@@ -19,7 +19,16 @@ def _get_default_device() -> torch.device:
 
 
 class BaseModel(ABC):
-    """Common interface for psychological feature extraction models."""
+    """Common interface for psychological feature extraction models.
+
+    Contract (constellation Contract B, §4.1): every feature column a model
+    emits starts with ``{name}_`` (or a prefix listed in ``extra_prefixes``),
+    and ``checkpoint`` identifies the exact architecture+weights for any
+    model with learned parameters (None for analytic models).
+    """
+
+    checkpoint: str | None = None
+    extra_prefixes: tuple[str, ...] = ()
 
     def __init__(self, device: str | None = None):
         if device:

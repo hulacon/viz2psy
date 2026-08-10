@@ -8,13 +8,20 @@ import pandas as pd
 from PIL import Image
 
 
-# Emotion categories from EmoNet
+# Emotion category columns from EmoNet
 EMOTION_CATEGORIES = [
-    "Adoration", "Aesthetic Appreciation", "Amusement", "Anxiety", "Awe",
-    "Boredom", "Confusion", "Craving", "Disgust", "Empathic Pain",
-    "Entrancement", "Excitement", "Fear", "Horror", "Interest",
-    "Joy", "Romance", "Sadness", "Sexual Desire", "Surprise",
+    "emonet_adoration", "emonet_aesthetic_appreciation", "emonet_amusement",
+    "emonet_anxiety", "emonet_awe", "emonet_boredom", "emonet_confusion",
+    "emonet_craving", "emonet_disgust", "emonet_empathic_pain",
+    "emonet_entrancement", "emonet_excitement", "emonet_fear",
+    "emonet_horror", "emonet_interest", "emonet_joy", "emonet_romance",
+    "emonet_sadness", "emonet_sexual_desire", "emonet_surprise",
 ]
+
+
+def _emotion_label(column: str) -> str:
+    """Human-readable label for an emonet column (e.g. "Empathic Pain")."""
+    return column.removeprefix("emonet_").replace("_", " ").title()
 
 
 def _get_saliency_columns(df: pd.DataFrame) -> list[str]:
@@ -81,7 +88,7 @@ def _plot_emotions_panel(ax, df: pd.DataFrame, image_idx: int):
 
     ax.barh(y_pos, sorted_values[:n_show], color=colors)
     ax.set_yticks(y_pos)
-    ax.set_yticklabels(sorted_emotions[:n_show], fontsize=8)
+    ax.set_yticklabels([_emotion_label(e) for e in sorted_emotions[:n_show]], fontsize=8)
     ax.invert_yaxis()
     ax.set_xlabel("Probability")
     ax.set_title("Top Emotions")
@@ -94,8 +101,8 @@ def _plot_bars_panel(ax, df: pd.DataFrame, image_idx: int):
 
     # Check for common scalar features
     candidates = [
-        ("memorability", "Memorability"),
-        ("aesthetic_score", "Aesthetics"),
+        ("resmem_memorability", "Memorability"),
+        ("aesthetics_score", "Aesthetics"),
     ]
 
     for col, label in candidates:

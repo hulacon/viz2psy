@@ -33,6 +33,11 @@ EMOTION_CATEGORIES = [
     "Surprise",
 ]
 
+# Output column names: emonet_{snake_case_category}.
+EMONET_COLUMNS = [
+    "emonet_" + c.lower().replace(" ", "_") for c in EMOTION_CATEGORIES
+]
+
 # EmoNet expects 227x227, pixel values in 0-255 range (no normalization).
 # PILToTensor keeps uint8 [0,255]; the model's forward() casts to float.
 _emonet_transform = T.Compose([
@@ -115,6 +120,7 @@ class EmoNetModel(BaseModel):
     """
 
     name = "emonet"
+    checkpoint = "emonet-pytorch/osf-amdju"
 
     def __init__(self, weights_path: Path | str | None = None, device: str | None = None):
         super().__init__(device=device)
@@ -140,7 +146,7 @@ class EmoNetModel(BaseModel):
         x = _emonet_transform(image).unsqueeze(0).to(self.device)
         with torch.no_grad():
             probs = self.model(x).squeeze(0).tolist()
-        return dict(zip(EMOTION_CATEGORIES, probs))
+        return dict(zip(EMONET_COLUMNS, probs))
 
     def predict_batch(self, images: list[Image.Image]) -> list[dict[str, float]]:
         tensors = [_emonet_transform(img) for img in images]
@@ -148,6 +154,6 @@ class EmoNetModel(BaseModel):
         with torch.no_grad():
             probs = self.model(batch)  # (N, 20)
         return [
-            dict(zip(EMOTION_CATEGORIES, row.tolist()))
+            dict(zip(EMONET_COLUMNS, row.tolist()))
             for row in probs
         ]

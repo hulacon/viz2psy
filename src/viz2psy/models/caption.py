@@ -5,24 +5,29 @@ from PIL import Image
 
 from .base import BaseModel
 
+_DEFAULT_MODEL_NAME = "Salesforce/blip-image-captioning-large"
+
 
 class CaptionModel(BaseModel):
     """Generate natural language captions using BLIP.
 
     Uses Salesforce's BLIP model for image captioning. Returns a single
-    'caption' column with the generated text description of each image.
+    'caption_text' column (string dtype) with the generated text
+    description of each image.
     """
 
     name = "caption"
+    checkpoint = _DEFAULT_MODEL_NAME
 
     def __init__(
         self,
-        model_name: str = "Salesforce/blip-image-captioning-large",
+        model_name: str = _DEFAULT_MODEL_NAME,
         max_length: int = 75,
         device: str | None = None,
     ):
         super().__init__(device=device)
         self.model_name = model_name
+        self.checkpoint = model_name
         self.max_length = max_length
         self._processor = None
 
@@ -51,7 +56,7 @@ class CaptionModel(BaseModel):
             )
 
         caption = self._processor.decode(output_ids[0], skip_special_tokens=True)
-        return {"caption": caption}
+        return {"caption_text": caption}
 
     def predict_batch(self, images: list[Image.Image]) -> list[dict]:
         # Ensure RGB for all images
@@ -70,4 +75,4 @@ class CaptionModel(BaseModel):
             )
 
         captions = self._processor.batch_decode(output_ids, skip_special_tokens=True)
-        return [{"caption": cap} for cap in captions]
+        return [{"caption_text": cap} for cap in captions]

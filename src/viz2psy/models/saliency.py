@@ -25,6 +25,7 @@ class SaliencyModel(BaseModel):
     """
 
     name = "saliency"
+    checkpoint = "DeepGazeIIE-pretrained"
 
     def __init__(self, grid_size: int = _DEFAULT_GRID_SIZE, device: str | None = None):
         super().__init__(device=device)

@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-08-10
+
+### Changed (BREAKING — output column names)
+
+Conform to the constellation Contract B extractor-output convention
+(mmmdata-agents `docs/constellation-contracts.md` §4.1): every feature
+column now carries its model's registry-name prefix. **Consumers must do:**
+re-extract, or apply `viz2psy.columns.apply_legacy_renames()` when loading
+pre-0.6.0 CSVs (the viz CLI does this automatically).
+
+- emonet: bare capitalized names (`Adoration`, `Aesthetic Appreciation`, …)
+  → `emonet_adoration`, `emonet_aesthetic_appreciation`, … (snake_case)
+- llstat: 17 bare scalars (`luminance_mean`, …) → `llstat_*`
+- yolo aggregates: `object_count`, `category_count`, `object_coverage`,
+  `largest_object_ratio`, `mean_confidence` → `yolo_*`
+- resmem: `memorability` → `resmem_memorability`
+- aesthetics: `aesthetic_score` → `aesthetics_score`
+- caption: `caption` → `caption_text`
+- places `sunattr_*` columns unchanged — declared as an extra prefix of the
+  places model (distinct feature space from `places_*` scenes)
+
+### Added
+
+- Sidecar (`.meta.json`): `schema_version` ("1.0"), `extractor`,
+  `extractor_version`, and per-model `package_version` + **`checkpoint`**
+  (exact architecture+weights identifier, e.g. `ViT-B-32/laion2b_s34b_b79k`)
+  — checkpoint identity backs the cross-modal space guarantees in psytwill.
+  Legacy `viz2psy_version` and per-model `version` keys retained for one
+  deprecation cycle.
+- `viz2psy.columns` module: `LEGACY_RENAMES` map +
+  `apply_legacy_renames(df)` for loading pre-0.6.0 scores CSVs (the viz
+  CLI applies it automatically at load).
+- `BaseModel.checkpoint` / `BaseModel.extra_prefixes` class attributes.
+- **`stimulus_id` column** (first column of every scores CSV): filename
+  stem per image, input-file stem for video/HDF5 (`time` / `image_idx`
+  disambiguate rows), `--stimulus-id` to override with a constant.
+- Output parent directories are created automatically.
+
+
+## Initial release feature summary
 
 ### Added
 

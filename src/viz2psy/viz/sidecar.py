@@ -1,7 +1,7 @@
 """Sidecar metadata utilities for visualization.
 
 Loads and parses .meta.json sidecar files to provide:
-- Semantic labels for features (e.g., "Adoration" instead of column name)
+- Semantic labels for features (e.g., "Adoration" instead of "emonet_adoration")
 - Index column detection (time, filename, image_idx)
 - Model information for tooltips
 - Image path/data resolution for all input types
@@ -102,12 +102,17 @@ class SidecarMetadata:
             obj_name = column.replace("yolo_", "")
             return obj_name.replace("_", " ").title()
 
+        if column.startswith("emonet_"):
+            # Strip prefix and clean up emotion name (e.g., "Empathic Pain")
+            emotion_name = column.replace("emonet_", "")
+            return emotion_name.replace("_", " ").title()
+
         # For other columns, check if the model has named columns
         model_name = self.get_model_for_column(column)
         if model_name:
             features = self.models[model_name].get("features", {})
             if "columns" in features:
-                # Already semantic (e.g., "Adoration", "memorability")
+                # Named columns returned as-is (e.g., "emonet_adoration", "resmem_memorability")
                 return column
 
         # For clip_, gist_, dinov2_, saliency_ - no semantic labels available

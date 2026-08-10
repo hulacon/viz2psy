@@ -35,12 +35,13 @@ def get_model_version(model_name: str) -> str:
         "resmem": ("resmem", None),
         "emonet": (None, "1.0"),  # No package, bundled
         "clip": ("open_clip_torch", None),
+        "caption": ("transformers", None),
         "gist": (None, "1.0"),  # Custom implementation
         "llstat": (None, "1.0"),  # Custom implementation
         "saliency": ("deepgaze_pytorch", None),
         "dinov2": ("torch", "facebookresearch/dinov2"),
         "aesthetics": ("open_clip_torch", "LAION"),
-        "places": (None, "wideresnet18-places365"),
+        "places": ("torch", None),  # inline arch; checkpoint field names the weights
         "yolo": ("ultralytics", None),
     }
 
@@ -52,6 +53,24 @@ def get_model_version(model_name: str) -> str:
         except Exception:
             pass
     return fallback or "unknown"
+
+
+def get_model_contract(model_name: str) -> tuple[str | None, list[str]]:
+    """Return (checkpoint, extra_prefixes) from the model class.
+
+    Class-level defaults only — accurate for CLI runs, which never override
+    checkpoint arguments. API users constructing models with non-default
+    checkpoints should amend the sidecar themselves.
+    """
+    try:
+        from viz2psy.cli import _load_model_class
+        cls = _load_model_class(model_name)
+        return (
+            getattr(cls, "checkpoint", None),
+            list(getattr(cls, "extra_prefixes", ())),
+        )
+    except Exception:
+        return None, []
 
 
 def get_feature_info(model_name: str, feature_names: list[str]) -> dict[str, Any]:
@@ -88,6 +107,13 @@ def get_feature_info(model_name: str, feature_names: list[str]) -> dict[str, Any
             "count": count
         }
 
+    if model_name == "caption":
+        return {
+            "columns": feature_names,
+            "count": count,
+            "dtype": "string"
+        }
+
     # Named features - use definition reference
     if model_name in ("emonet", "places", "yolo", "llstat", "resmem", "aesthetics"):
         return {
@@ -120,8 +146,17 @@ def build_feature_definitions(model_features: dict[str, list[str]]) -> dict[str,
             }
 
         elif model_name == "yolo":
-            objects = [f.replace("yolo_", "") for f in features if f.startswith("yolo_")]
-            stats = [f for f in features if not f.startswith("yolo_")]
+            stat_names = {
+                "yolo_object_count", "yolo_category_count",
+                "yolo_object_coverage", "yolo_largest_object_ratio",
+                "yolo_mean_confidence",
+            }
+            objects = [
+                f.replace("yolo_", "")
+                for f in features
+                if f.startswith("yolo_") and f not in stat_names
+            ]
+            stats = [f for f in features if f in stat_names]
             definitions["yolo"] = {
                 "objects": objects,
                 "stats": stats
@@ -205,11 +240,18 @@ class MetadataBuilder:
 
     def add_model(self, model_name: str, feature_names: list[str], runtime_sec: float):
         """Add model info after it completes."""
-        self.models[model_name] = {
-            "version": get_model_version(model_name),
+        checkpoint, extra_prefixes = get_model_contract(model_name)
+        package_version = get_model_version(model_name)
+        entry = {
+            "version": package_version,  # legacy key, one deprecation cycle
+            "package_version": package_version,
+            "checkpoint": checkpoint,
             "runtime_sec": round(runtime_sec, 3),
             "features": get_feature_info(model_name, feature_names)
         }
+        if extra_prefixes:
+            entry["prefixes"] = [model_name] + extra_prefixes
+        self.models[model_name] = entry
         self.model_features[model_name] = feature_names
         self.total_runtime_sec += runtime_sec
 
@@ -220,7 +262,10 @@ class MetadataBuilder:
         models_with_defs = {k: v for k, v in self.model_features.items() if k in needs_definition}
 
         metadata = {
-            "viz2psy_version": get_version(),
+            "schema_version": "1.0",
+            "extractor": "viz2psy",
+            "extractor_version": get_version(),
+            "viz2psy_version": get_version(),  # legacy key, one deprecation cycle
             "created_at": self.created_at,
             "input": self.input_info,
             "output": self.output_info,

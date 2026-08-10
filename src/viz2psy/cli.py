@@ -907,6 +907,15 @@ def main():
         help="Suppress progress output.",
     )
     parser.add_argument(
+        "--stimulus-id",
+        default=None,
+        help=(
+            "Constant stimulus_id value for the output rows (single-stimulus "
+            "runs: video or HDF5). Default: filename stem per image, or the "
+            "input file's stem for video/HDF5."
+        ),
+    )
+    parser.add_argument(
         "--all",
         action="store_true",
         help="Run all available models.",
@@ -1134,7 +1143,22 @@ def main():
                 parallel=args.parallel,
             )
 
+        # Canonical stimulus identity (Contract B convention §4.1):
+        # filename stem per image row; the input file's stem for video/HDF5
+        # (where `time` / `image_idx` disambiguates rows).
+        if "stimulus_id" not in result_df.columns:
+            if args.stimulus_id is not None:
+                sid = args.stimulus_id
+            elif "filename" in result_df.columns:
+                sid = [Path(str(f)).stem for f in result_df["filename"]]
+            else:
+                source = video_path or hdf5_path
+                sid = source.stem if source is not None else None
+            if sid is not None:
+                result_df.insert(0, "stimulus_id", sid)
+
         if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
             result_df.to_csv(args.output, index=False)
 
             # Save metadata sidecar

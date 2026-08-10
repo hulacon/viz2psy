@@ -7,10 +7,10 @@ Examples
     viz2psy-viz wordcloud scores.csv -o cloud.png
 
     # Time series of video scores
-    viz2psy-viz timeseries scores.csv --features memorability -o plot.png
+    viz2psy-viz timeseries scores.csv --features resmem_memorability -o plot.png
 
     # Interactive timeseries with zoom/pan
-    viz2psy-viz timeseries scores.csv --features memorability -i -o plot.html
+    viz2psy-viz timeseries scores.csv --features resmem_memorability -i -o plot.html
 
     # Timeseries with diff and rolling average (auto for video)
     viz2psy-viz timeseries scores.csv --show-diff --rolling-window 10 -o plot.png
@@ -31,7 +31,7 @@ Examples
     viz2psy-viz composite image.jpg scores.csv --panels saliency,emotions -o composite.png
 
     # Linked scatter + timeseries explorer
-    viz2psy-viz explorer scores.csv --scatter-features "clip_*" --timeseries-features memorability -o explorer.html
+    viz2psy-viz explorer scores.csv --scatter-features "clip_*" --timeseries-features resmem_memorability -o explorer.html
 
     # Single-image viewer with feature panels (explicit image path)
     viz2psy-viz image scores.csv photo.jpg --panels emotions_bar,scalars -o viewer.html
@@ -55,6 +55,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from viz2psy.columns import apply_legacy_renames
+
 from .projection import PROJECTION_METHODS
 
 
@@ -63,6 +65,7 @@ def cmd_wordcloud(args):
     from .wordcloud import make_wordcloud
 
     df = pd.read_csv(args.input)
+    df = apply_legacy_renames(df)
     fig = make_wordcloud(
         df,
         image_idx=args.image,
@@ -80,6 +83,7 @@ def cmd_wordcloud(args):
 def cmd_timeseries(args):
     """Plot feature time series."""
     df = pd.read_csv(args.input)
+    df = apply_legacy_renames(df)
 
     if args.interactive:
         from .interactive.timeseries import plot_timeseries_interactive
@@ -137,6 +141,7 @@ def cmd_heatmap(args):
     from .heatmap import plot_heatmap
 
     df = pd.read_csv(args.input)
+    df = apply_legacy_renames(df)
     fig = plot_heatmap(
         df,
         features=args.features,
@@ -154,6 +159,7 @@ def cmd_heatmap(args):
 def cmd_scatter(args):
     """Plot 2D scatter projection."""
     df = pd.read_csv(args.input)
+    df = apply_legacy_renames(df)
 
     if args.interactive:
         from .interactive.scatter import plot_scatter_interactive
@@ -203,6 +209,7 @@ def cmd_composite(args):
     from .composite import plot_composite
 
     df = pd.read_csv(args.scores)
+    df = apply_legacy_renames(df)
     fig = plot_composite(
         image_path=args.image,
         scores_df=df,
@@ -225,6 +232,7 @@ def cmd_explorer(args):
     from .sidecar import load_sidecar
 
     df = pd.read_csv(args.input)
+    df = apply_legacy_renames(df)
     sidecar = load_sidecar(args.input)
 
     fig = create_linked_explorer(
@@ -261,6 +269,7 @@ def cmd_image(args):
     from .sidecar import load_sidecar, create_unified_resolver
 
     df = pd.read_csv(args.scores)
+    df = apply_legacy_renames(df)
     sidecar = load_sidecar(args.scores)
 
     # Create unified resolver for all input types
@@ -382,6 +391,7 @@ def cmd_hyperplot(args):
     from .sidecar import load_sidecar
 
     df = pd.read_csv(args.input)
+    df = apply_legacy_renames(df)
     sidecar = load_sidecar(args.input)
 
     fig = plot_hypertools(
@@ -409,6 +419,7 @@ def cmd_dashboard(args):
     from .sidecar import load_sidecar, UnifiedImageResolver
 
     df = pd.read_csv(args.input)
+    df = apply_legacy_renames(df)
     sidecar = load_sidecar(args.input)
 
     print(f"Creating dashboard for {args.input}...")
@@ -466,6 +477,7 @@ def cmd_recommend(args):
     )
 
     df = pd.read_csv(args.input)
+    df = apply_legacy_renames(df)
     columns = df.columns.tolist()
 
     recommendations = get_visualization_recommendations(columns)
@@ -531,9 +543,9 @@ def cmd_recommend(args):
             if model in ["clip", "gist", "dinov2", "saliency", "places"]:
                 pattern = f'"{model}_*"'
             elif model == "emonet":
-                pattern = "Adoration Amusement Excitement Fear Joy"
+                pattern = "emonet_adoration emonet_amusement emonet_excitement emonet_fear emonet_joy"
             elif model == "llstat":
-                pattern = '"luminance_*" rms_contrast colorfulness edge_density'
+                pattern = '"llstat_luminance_*" llstat_rms_contrast llstat_colorfulness llstat_edge_density'
             elif model == "yolo":
                 pattern = '"yolo_*"'
             else:
@@ -571,9 +583,9 @@ def cmd_recommend(args):
             if model in ["clip", "gist", "dinov2", "saliency", "places"]:
                 pattern = f'"{model}_*"'
             elif model == "emonet":
-                pattern = "Adoration Amusement Excitement Fear Joy Sadness"
+                pattern = "emonet_adoration emonet_amusement emonet_excitement emonet_fear emonet_joy emonet_sadness"
             elif model == "llstat":
-                pattern = '"luminance_*" rms_contrast colorfulness'
+                pattern = '"llstat_luminance_*" llstat_rms_contrast llstat_colorfulness'
             elif model == "yolo":
                 pattern = '"yolo_*"'
             else:

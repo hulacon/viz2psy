@@ -36,14 +36,15 @@ class YOLOModel(BaseModel):
     """YOLO object detection with per-category counts and summary features.
 
     Outputs 80 per-category count columns (yolo_{category}), plus:
-    - object_count: total detected objects
-    - category_count: number of distinct categories present
-    - object_coverage: fraction of image area covered by detections
-    - largest_object_ratio: largest single detection / image area
-    - mean_confidence: average detection confidence
+    - yolo_object_count: total detected objects
+    - yolo_category_count: number of distinct categories present
+    - yolo_object_coverage: fraction of image area covered by detections
+    - yolo_largest_object_ratio: largest single detection / image area
+    - yolo_mean_confidence: average detection confidence
     """
 
     name = "yolo"
+    checkpoint = _DEFAULT_MODEL
 
     def __init__(
         self,
@@ -54,6 +55,7 @@ class YOLOModel(BaseModel):
     ):
         super().__init__(device=device)
         self.model_name = model_name
+        self.checkpoint = model_name
         self.conf = conf
         self.iou = iou
 
@@ -80,20 +82,20 @@ class YOLOModel(BaseModel):
             row[f"yolo_{name}"] = float(counts[i])
 
         # Aggregate features.
-        row["object_count"] = float(len(classes))
-        row["category_count"] = float(len(np.unique(classes))) if len(classes) else 0.0
+        row["yolo_object_count"] = float(len(classes))
+        row["yolo_category_count"] = float(len(np.unique(classes))) if len(classes) else 0.0
 
         if len(xyxy) > 0:
             widths = xyxy[:, 2] - xyxy[:, 0]
             heights = xyxy[:, 3] - xyxy[:, 1]
             areas = widths * heights
-            row["object_coverage"] = float(min(areas.sum() / img_area, 1.0))
-            row["largest_object_ratio"] = float(areas.max() / img_area)
-            row["mean_confidence"] = float(confs.mean())
+            row["yolo_object_coverage"] = float(min(areas.sum() / img_area, 1.0))
+            row["yolo_largest_object_ratio"] = float(areas.max() / img_area)
+            row["yolo_mean_confidence"] = float(confs.mean())
         else:
-            row["object_coverage"] = 0.0
-            row["largest_object_ratio"] = 0.0
-            row["mean_confidence"] = 0.0
+            row["yolo_object_coverage"] = 0.0
+            row["yolo_largest_object_ratio"] = 0.0
+            row["yolo_mean_confidence"] = 0.0
 
         return row
 

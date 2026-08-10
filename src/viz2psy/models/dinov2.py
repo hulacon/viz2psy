@@ -28,10 +28,12 @@ class DINOv2Model(BaseModel):
     """
 
     name = "dinov2"
+    checkpoint = _DEFAULT_MODEL_NAME
 
     def __init__(self, model_name: str = _DEFAULT_MODEL_NAME, device: str | None = None):
         super().__init__(device=device)
         self.model_name = model_name
+        self.checkpoint = model_name
         self._transform = T.Compose([
             T.Resize(256, interpolation=T.InterpolationMode.BICUBIC),
             T.CenterCrop(224),

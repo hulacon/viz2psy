@@ -17,6 +17,7 @@ class CLIPModel(BaseModel):
     """
 
     name = "clip"
+    checkpoint = f"{_DEFAULT_MODEL_NAME}/{_DEFAULT_PRETRAINED}"
 
     def __init__(
         self,
@@ -27,6 +28,7 @@ class CLIPModel(BaseModel):
         super().__init__(device=device)
         self.model_name = model_name
         self.pretrained = pretrained
+        self.checkpoint = f"{model_name}/{pretrained}"
         self._preprocess = None
 
     def load(self) -> None:

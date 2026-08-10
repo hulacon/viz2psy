@@ -198,10 +198,10 @@ Output is a CSV with one row per image/frame:
 | `<feature>` | Model output values |
 
 Feature column names follow model conventions:
-- Scalar features: `memorability`, `aesthetic_score`
+- Scalar features: `resmem_memorability`, `aesthetics_score`
 - Embeddings: `clip_000`, `clip_001`, ..., `clip_511`
 - Grids: `saliency_00_00`, `saliency_00_01`, ...
-- Categories: `Adoration`, `Amusement`, `places_000`, `yolo_person`
+- Categories: `emonet_adoration`, `emonet_amusement`, `places_000`, `yolo_person`
 
 ### Metadata Sidecar
 
@@ -225,7 +225,7 @@ When saving to file, a `.meta.json` sidecar is created with:
   "total_runtime_sec": 45.2,
   "models": {
     "resmem": {
-      "features": {"columns": ["memorability"]},
+      "features": {"columns": ["resmem_memorability"]},
       "runtime_sec": 12.3
     },
     "clip": {

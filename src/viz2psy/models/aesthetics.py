@@ -53,6 +53,7 @@ class AestheticsModel(BaseModel):
     """
 
     name = "aesthetics"
+    checkpoint = f"{_CLIP_MODEL}/{_CLIP_PRETRAINED}+sac+logos+ava1-l14-linearMSE"
 
     def __init__(self, device: str | None = None):
         super().__init__(device=device)
@@ -91,7 +92,7 @@ class AestheticsModel(BaseModel):
         emb = self._embed(x)
         with torch.no_grad():
             score = self._head(emb).item()
-        return {"aesthetic_score": score}
+        return {"aesthetics_score": score}
 
     def predict_batch(self, images: list[Image.Image]) -> list[dict[str, float]]:
         tensors = [self._preprocess(img.convert("RGB")) for img in images]
@@ -99,4 +100,4 @@ class AestheticsModel(BaseModel):
         emb = self._embed(batch)
         with torch.no_grad():
             scores = self._head(emb).squeeze(1).tolist()
-        return [{"aesthetic_score": s} for s in scores]
+        return [{"aesthetics_score": s} for s in scores]
