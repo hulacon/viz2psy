@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-08-17
+
+### Added
+
+- `ebind` model: 1024-d L2-normalized image embeddings from EBind's
+  Perception Encoder vision arm (checkpoint `encord-team/ebind-full`,
+  revision-pinned). Shares one cross-modal space with word2psy
+  `ebind_text` and aud2psy `ebind_audio`. First >999-d space in the
+  family: columns are fixed-width 4-digit (`ebind_0000..ebind_1023`)
+  per the amended contracts §4.1.
+
 ## [0.6.0] - 2026-08-10
 
 ### Changed (BREAKING — output column names)

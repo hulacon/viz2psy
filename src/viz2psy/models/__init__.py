@@ -10,6 +10,7 @@ def __getattr__(name):
         "ResMemModel": ".resmem",
         "EmoNetModel": ".emonet",
         "CLIPModel": ".clip",
+        "EBindModel": ".ebind",
         "GISTModel": ".gist",
         "LLStatModel": ".llstat",
         "SaliencyModel": ".saliency",

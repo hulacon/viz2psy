@@ -35,6 +35,7 @@ def get_model_version(model_name: str) -> str:
         "resmem": ("resmem", None),
         "emonet": (None, "1.0"),  # No package, bundled
         "clip": ("open_clip_torch", None),
+        "ebind": ("ebind", None),
         "caption": ("transformers", None),
         "gist": (None, "1.0"),  # Custom implementation
         "llstat": (None, "1.0"),  # Custom implementation

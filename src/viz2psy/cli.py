@@ -53,6 +53,7 @@ MODEL_REGISTRY = {
     "resmem": ("viz2psy.models.resmem", "ResMemModel", "Image memorability (0-1)"),
     "emonet": ("viz2psy.models.emonet", "EmoNetModel", "20 emotion category probabilities"),
     "clip": ("viz2psy.models.clip", "CLIPModel", "512-dim CLIP ViT-B-32 embeddings"),
+    "ebind": ("viz2psy.models.ebind", "EBindModel", "1024-dim EBind image embeddings (shared space with word2psy/aud2psy)"),
     "caption": ("viz2psy.models.caption", "CaptionModel", "Natural language image captions (BLIP)"),
     "gist": ("viz2psy.models.gist", "GISTModel", "512-dim Gabor spatial envelope features"),
     "llstat": ("viz2psy.models.llstat", "LLStatModel", "17 low-level image statistics"),
