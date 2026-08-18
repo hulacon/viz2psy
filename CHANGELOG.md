@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1] - 2026-08-18
+
+Housekeeping release for public use — documentation, packaging metadata, and
+citations; no feature-output changes.
+
+### Added
+
+- `caption` and `ebind` optional-dependency extras (`transformers` and the
+  GitHub-only `ebind` package were previously undeclared, so those two models
+  failed at load time on a clean install).
+- `ebind` documented in README and `docs/models.md`, with EBind and
+  Perception Encoder references.
+- `CITATION.cff` for citing viz2psy itself.
+- README "Related packages" section pointing at aud2psy, word2psy, and
+  psytwill, and describing the shared CLIP and EBind cross-modal spaces.
+- Full references with DOIs/arXiv links for every model.
+
+### Fixed
+
+- `pyproject.toml` project URLs pointed at the pre-transfer
+  `github.com/bhutch/viz2psy`; now `hulacon/viz2psy`.
+- LICENSE copyright line named the wrong person ("Brice Hutcheson", 2024);
+  now Ben Hutchinson, 2026.
+- `viz2psy.models` lazy registry was missing `CaptionModel`.
+- README install instructions claimed `pip install viz2psy` (not on PyPI);
+  now the `git+` form.
+- docs: `clip` mis-attributed to OpenAI weights (it uses OpenCLIP
+  `laion2b_s34b_b79k`); `LowLevelStatModel` corrected to `LLStatModel` in
+  two code snippets; DeepGaze IIE reference corrected to Linardos et al.
+  (2021, ICCV); removed unused `setuptools-scm` build requirement.
+
 ## [0.7.0] - 2026-08-17
 
 ### Added

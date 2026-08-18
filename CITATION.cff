@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+message: >-
+  If you use this software, please cite it using the metadata below,
+  and cite the papers behind the specific models you used (see the
+  "Citing" section of README.md).
+type: software
+title: "viz2psy: psychological and perceptual feature extraction from images and video"
+authors:
+  - family-names: Hutchinson
+    given-names: Ben
+    email: bhutch@uoregon.edu
+    affiliation: University of Oregon
+repository-code: "https://github.com/hulacon/viz2psy"
+license: MIT
+version: 0.7.1
+date-released: 2026-08-18
+keywords:
+  - image features
+  - memorability
+  - emotion
+  - computer vision
+  - psychology
+  - neuroscience

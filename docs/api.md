@@ -96,8 +96,10 @@ class BaseModel:
 from viz2psy.models.resmem import ResMemModel
 from viz2psy.models.emonet import EmoNetModel
 from viz2psy.models.clip import CLIPModel
+from viz2psy.models.ebind import EBindModel
+from viz2psy.models.caption import CaptionModel
 from viz2psy.models.gist import GISTModel
-from viz2psy.models.llstat import LowLevelStatModel
+from viz2psy.models.llstat import LLStatModel
 from viz2psy.models.saliency import SaliencyModel
 from viz2psy.models.dinov2 import DINOv2Model
 from viz2psy.models.aesthetics import AestheticsModel

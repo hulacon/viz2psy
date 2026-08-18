@@ -1,6 +1,6 @@
 # Models
 
-viz2psy provides wrappers for 11 computational models covering memorability, emotion, semantics, captioning, low-level statistics, and visual attention.
+viz2psy provides wrappers for 12 computational models covering memorability, emotion, semantics, captioning, low-level statistics, and visual attention.
 
 ## Overview
 
@@ -8,7 +8,8 @@ viz2psy provides wrappers for 11 computational models covering memorability, emo
 |-------|--------|----------|-------------|
 | `resmem` | 1 score | Memory | Image memorability prediction |
 | `emonet` | 20 scores | Emotion | Emotion category probabilities |
-| `clip` | 512 dims | Semantics | Vision-language embeddings |
+| `clip` | 512 dims | Semantics | Vision-language embeddings (OpenCLIP) |
+| `ebind` | 1024 dims | Semantics | Cross-modal EBind embeddings (shared image–text–audio space) |
 | `caption` | 1 caption | Captioning | Natural language image captions (BLIP) |
 | `dinov2` | 768 dims | Semantics | Self-supervised visual features |
 | `gist` | 512 dims | Scene | Spatial envelope descriptor |
@@ -59,16 +60,34 @@ model = EmoNetModel()
 
 ### clip
 
-Extracts vision-language embeddings using OpenAI's CLIP model.
+Extracts vision-language embeddings using OpenCLIP.
 
 - **Output**: 512-dimensional L2-normalized embedding (`clip_000` to `clip_511`)
-- **Model**: CLIP ViT-B/32
+- **Model**: OpenCLIP ViT-B/32, LAION-2B weights (`laion2b_s34b_b79k`) — not the original OpenAI checkpoint
 - **Use cases**: Semantic similarity, zero-shot classification, cross-modal retrieval
-- **Reference**: Radford, A., et al. (2021). Learning transferable visual models from natural language supervision. *ICML*.
+- **Cross-modal**: same space as word2psy `clip_text` (identical checkpoint), so image and text embeddings are directly comparable
+- **Reference**: Radford, A., et al. (2021). Learning transferable visual models from natural language supervision. *ICML*. Weights: Cherti, M., et al. (2023). Reproducible scaling laws for contrastive language-image learning. *CVPR*.
 
 ```python
 from viz2psy.models.clip import CLIPModel
 model = CLIPModel()
+```
+
+### ebind
+
+Extracts cross-modal embeddings from EBind's Perception Encoder vision arm.
+Images, video frames, text (word2psy `ebind_text`), and audio (aud2psy
+`ebind_audio`) all land in one shared 1024-d space.
+
+- **Output**: 1024-dimensional L2-normalized embedding (`ebind_0000` to `ebind_1023`; fixed-width 4-digit indices)
+- **Model**: EBind (`encord-team/ebind-full`, revision-pinned); vision arm is Perception Encoder `PE-Core-L14-336`
+- **Install**: requires the `ebind` extra (`pip install "viz2psy[ebind]"` from source); weights are CC-BY-NC-SA 4.0 (non-commercial)
+- **Use cases**: cross-modal similarity between images, text, and audio without a projection step
+- **Reference**: Broadbent, J., et al. (2025). EBind: A practical approach to space binding. *arXiv:2511.14229*. Bolya, D., et al. (2025). Perception Encoder: The best visual embeddings are not at the output of the network. *NeurIPS*.
+
+```python
+from viz2psy.models.ebind import EBindModel
+model = EBindModel()
 ```
 
 ---
@@ -144,7 +163,7 @@ Predicts scene categories and attributes.
 - **Model**: Places365 CNN + SUN Attributes
 - **Categories**: Indoor/outdoor scenes (kitchen, beach, office, etc.)
 - **Attributes**: Natural, open, enclosed, rugged, etc.
-- **Reference**: Zhou, B., et al. (2017). Places: A 10 million image database for scene recognition. *TPAMI*.
+- **Reference**: Zhou, B., et al. (2018). Places: A 10 million image database for scene recognition. *IEEE TPAMI, 40*(6), 1452–1464.
 
 ```python
 from viz2psy.models.places import PlacesModel
@@ -168,10 +187,11 @@ Computes low-level image statistics.
   - `llstat_hf_energy`, `llstat_lf_energy` - High/low frequency energy (FFT)
   - `llstat_edge_density` - Canny edge density
   - `llstat_colorfulness` - Hasler & Süsstrunk metric
+- **Reference** (colorfulness): Hasler, D., & Suesstrunk, S. E. (2003). Measuring colorfulness in natural images. *SPIE Human Vision and Electronic Imaging VIII*.
 
 ```python
-from viz2psy.models.llstat import LowLevelStatModel
-model = LowLevelStatModel()
+from viz2psy.models.llstat import LLStatModel
+model = LLStatModel()
 ```
 
 ---
@@ -187,7 +207,7 @@ Predicts where humans are likely to fixate in an image.
   - Column naming: `saliency_X_Y` where X=column, Y=row
 - **Model**: DeepGaze IIE
 - **Note**: Falls back to CPU on Apple Silicon (MPS doesn't support float64)
-- **Reference**: Kümmerer, M., et al. (2022). DeepGaze IIE: Calibrated prediction in and out-of-domain for state-of-the-art saliency modeling. *ICCV*.
+- **Reference**: Linardos, A., Kümmerer, M., Press, O., & Bethge, M. (2021). DeepGaze IIE: Calibrated prediction in and out-of-domain for state-of-the-art saliency modeling. *ICCV 2021*.
 
 ```python
 from viz2psy.models.saliency import SaliencyModel
@@ -228,6 +248,7 @@ Detects and counts objects using YOLOv8.
   - `yolo_mean_confidence` - Average detection confidence
 - **Model**: YOLOv8n (nano)
 - **Classes**: COCO 80-class object categories
+- **Reference**: Jocher, G., Chaurasia, A., & Qiu, J. (2023). Ultralytics YOLOv8 (software). https://github.com/ultralytics/ultralytics
 
 ```python
 from viz2psy.models.yolo import YOLOModel

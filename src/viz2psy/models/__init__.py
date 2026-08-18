@@ -11,6 +11,7 @@ def __getattr__(name):
         "EmoNetModel": ".emonet",
         "CLIPModel": ".clip",
         "EBindModel": ".ebind",
+        "CaptionModel": ".caption",
         "GISTModel": ".gist",
         "LLStatModel": ".llstat",
         "SaliencyModel": ".saliency",

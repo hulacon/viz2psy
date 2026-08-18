@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=64", "setuptools-scm"]
+requires = ["setuptools>=64"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "viz2psy"
-version = "0.7.0"
+version = "0.7.1"
 description = "Extract psychological and perceptual features from images using multiple computational models"
 readme = "README.md"
 license = "MIT"
@@ -56,6 +56,8 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest", "ipython", "commitizen>=3.12"]
+caption = ["transformers>=4.40"]
+ebind = ["ebind @ git+https://github.com/encord-team/ebind"]
 interactive = ["plotly>=5.18", "kaleido>=0.2"]
 hypertools = ["hypertools>=0.8"]
 
@@ -64,16 +66,16 @@ viz2psy = "viz2psy.cli:main"
 viz2psy-viz = "viz2psy.viz.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/bhutch/viz2psy"
-Repository = "https://github.com/bhutch/viz2psy"
-Issues = "https://github.com/bhutch/viz2psy/issues"
+Homepage = "https://github.com/hulacon/viz2psy"
+Repository = "https://github.com/hulacon/viz2psy"
+Issues = "https://github.com/hulacon/viz2psy/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "0.7.0"
+version = "0.7.1"
 version_files = [
     "pyproject.toml:version",
     "src/viz2psy/__init__.py:__version__",
