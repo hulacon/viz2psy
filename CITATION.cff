@@ -7,7 +7,7 @@ type: software
 title: "viz2psy: psychological and perceptual feature extraction from images and video"
 authors:
   - family-names: Hutchinson
-    given-names: Ben
+    given-names: J. Benjamin
     email: bhutch@uoregon.edu
     affiliation: University of Oregon
 repository-code: "https://github.com/hulacon/viz2psy"
