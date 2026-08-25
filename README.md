@@ -96,6 +96,8 @@ df = score_images(model, ["photo1.jpg", "photo2.jpg"])
 | `saliency` | 576 dims | Fixation density grid |
 | `aesthetics` | 1 score | Aesthetic quality |
 | `yolo` | 85 scores | Object detection counts |
+| `motion` | 7 scores | Optical-flow motion statistics — **video only** (energy, coherence, pan/tilt, radial looming, frame difference; Farnebäck flow between native-adjacent frames at each grid timestamp, in frame-heights/s) |
+| `faces` | 5 scores | Face count/size/configuration (OpenCV YuNet): count, total/max area, framing, face clustering |
 
 See [docs/models.md](docs/models.md) for detailed documentation.
 

@@ -1,6 +1,6 @@
 """viz2psy — Visual image psychological feature extraction."""
 
-__version__ = "0.7.1"
+__version__ = "0.8.0"
 
 from .exceptions import (
     DeviceError,

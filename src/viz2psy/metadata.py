@@ -44,6 +44,8 @@ def get_model_version(model_name: str) -> str:
         "aesthetics": ("open_clip_torch", "LAION"),
         "places": ("torch", None),  # inline arch; checkpoint field names the weights
         "yolo": ("ultralytics", None),
+        "motion": ("opencv-python", None),  # analytic Farnebäck flow
+        "faces": ("opencv-python", None),  # YuNet via cv2.FaceDetectorYN
     }
 
     pkg, fallback = version_map.get(model_name, (None, "unknown"))

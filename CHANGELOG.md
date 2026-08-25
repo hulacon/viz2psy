@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-08-25
+
+### Added
+
+- **`motion` model — viz2psy's first temporal model.** Seven optical-flow
+  statistics per video timestamp: `motion_energy`, `_energy_p95`,
+  `_coherence` (global vs incoherent motion; NaN when there is no motion),
+  `_horizontal`/`_vertical` (signed pan/tilt), `_radial` (positive =
+  expansion/looming), `_frame_diff` (classic visual change; spikes at hard
+  cuts). Flow is dense Farnebäck between the native frame at each grid
+  timestamp and the NEXT native frame (one 1/fps step — flow across the
+  0.5 s grid spacing would measure nothing), grayscale, downscaled to
+  240 px height; flow-derived values are in frame-heights/second, so they
+  are resolution- and frame-rate-independent. Analytic (`checkpoint`
+  null). Rows align exactly with the per-frame models' rows; timestamps
+  with no next frame score NaN. Flow across a hard cut is left in as a
+  real visual transient (`motion_frame_diff` flags it) — cut-aware
+  handling belongs downstream.
+- **Video-only model class**: `motion` refuses still-image and HDF5
+  inputs with an error naming the fix, and runs off the video file inside
+  the video pipeline (sequential and parallel modes both).
+- **First test suite** (`tests/`): synthetic-video ground-truth tests for
+  the motion model (known translation direction, static-video zeros,
+  cut detection via frame_diff, image-input refusal).
+
+### Added (0.8.0, continued)
+
+- **`faces` model:** five face count/size/configuration statistics per
+  image — `faces_count`, `_total_area`, `_max_area` (shot scale),
+  `_center_dist` (framing), `_mutual_dist` (face clustering — the
+  two-shot/conversation configuration; NaN below two faces). Detection is
+  OpenCV's FaceDetectorYN (YuNet, `opencv_zoo/face_detection_yunet_2023mar`,
+  ~230 KB ONNX downloaded on first use to `~/.cache/viz2psy/` and
+  SHA-256-verified) — deliberately not mediapipe, whose dependency tree is
+  disproportionate to five scalars. A frame with no faces scores explicit
+  zeros, not NaN. Standard per-image model: runs on stills and video
+  frames alike.
+
 ## [0.7.1] - 2026-08-18
 
 Housekeeping release for public use — documentation, packaging metadata, and

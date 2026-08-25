@@ -62,7 +62,23 @@ MODEL_REGISTRY = {
     "aesthetics": ("viz2psy.models.aesthetics", "AestheticsModel", "Aesthetic quality score (1-10)"),
     "places": ("viz2psy.models.places", "PlacesModel", "365 scene + 102 attribute probabilities"),
     "yolo": ("viz2psy.models.yolo", "YOLOModel", "80 object counts + 5 summary statistics"),
+    "motion": ("viz2psy.models.motion", "MotionModel", "7 optical-flow motion statistics (video only)"),
+    "faces": ("viz2psy.models.faces", "FacesModel", "5 face count/size/configuration statistics (YuNet)"),
 }
+
+# Models that read the video itself (temporal structure) rather than the
+# extracted frame grid. They error on still-image inputs.
+VIDEO_ONLY_MODELS = {"motion"}
+
+
+def _reject_video_only(models: list[str], input_kind: str) -> None:
+    offenders = [m for m in models if m in VIDEO_ONLY_MODELS]
+    if offenders:
+        raise Viz2PsyError(
+            f"{', '.join(offenders)}: video-only model(s) — motion is defined "
+            f"between frames, and {input_kind} carry no temporal structure. "
+            f"Drop the model(s) or run on a video input."
+        )
 
 
 def _load_model_class(name: str):
@@ -333,6 +349,7 @@ def _process_hdf5(
     parallel: bool = False,
 ):
     """Process an HDF5 image brick with multiple models."""
+    _reject_video_only(models, "an HDF5 image brick")
     import time
 
     import h5py
@@ -586,6 +603,40 @@ def _process_video(
         times = [t for t, _ in frames]
         images_or_paths = [img for _, img in frames]
 
+        # Video-only models read the video directly, scored on the same
+        # timestamp list so their rows align with the per-frame models'.
+        motion_names = [m for m in models if m in VIDEO_ONLY_MODELS]
+        models = [m for m in models if m not in VIDEO_ONLY_MODELS]
+        video_results = {}  # name -> (scores, elapsed)
+        for model_name in motion_names:
+            import time as _time
+
+            model_cls = _load_model_class(model_name)
+            model = model_cls(device=device) if device else model_cls()
+            if not quiet:
+                print(f"Loading {model.name} model (video-only) ...")
+            try:
+                model.load()
+            except Exception as e:
+                raise ModelLoadError(model_name, str(e)) from e
+            t0 = _time.time()
+            try:
+                scores = model.predict_video(video_path, times, quiet=quiet)
+            except Exception as e:
+                raise InferenceError(model_name, str(e)) from e
+            video_results[model_name] = (scores, _time.time() - t0)
+
+        def _merge_video_results(result_df):
+            import pandas as pd
+
+            for model_name, (scores, elapsed) in video_results.items():
+                scores_df = pd.DataFrame(scores)
+                for col in scores_df.columns:
+                    result_df[col] = scores_df[col]
+                if metadata:
+                    metadata.add_model(model_name, list(scores_df.columns), elapsed)
+            return result_df
+
         # Parallel execution with frames on disk
         if parallel and len(models) > 1 and (save_frames or use_temp_dir):
             from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -636,7 +687,7 @@ def _process_video(
                 if metadata:
                     metadata.add_model(model_name, feature_names, elapsed)
 
-            return result_df
+            return _merge_video_results(result_df)
 
         # Sequential execution (original behavior)
         # If we have paths, load them as PIL images for scoring
@@ -694,7 +745,7 @@ def _process_video(
             if metadata:
                 metadata.add_model(model_name, feature_names, elapsed)
 
-        return result_df
+        return _merge_video_results(result_df)
 
     finally:
         # Clean up temp directory if used
@@ -712,6 +763,7 @@ def _process_images(
     parallel: bool = False,
 ):
     """Process image files and return a DataFrame."""
+    _reject_video_only(models, "still images")
     import time
     import pandas as pd
     from viz2psy.pipeline import score_images
