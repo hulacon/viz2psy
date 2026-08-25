@@ -98,6 +98,7 @@ df = score_images(model, ["photo1.jpg", "photo2.jpg"])
 | `yolo` | 85 scores | Object detection counts |
 | `motion` | 7 scores | Optical-flow motion statistics — **video only** (energy, coherence, pan/tilt, radial looming, frame difference; Farnebäck flow between native-adjacent frames at each grid timestamp, in frame-heights/s) |
 | `faces` | 5 scores | Face count/size/configuration (OpenCV YuNet): count, total/max area, framing, face clustering |
+| `depth` | 6 scores | Scene layout from monocular relative depth (Depth Anything V2 small): foreground fraction, openness, spread/skew, depth clutter, composition — all invariant to the per-image depth normalization |
 
 See [docs/models.md](docs/models.md) for detailed documentation.
 

@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-08-25
+
+### Added
+
+- **`depth` model:** six scene-layout statistics from Depth Anything V2
+  Small relative depth — `depth_fg_fraction`, `_openness`, `_iqr`,
+  `_skew`, `_edge_density` (spatial clutter), `_center_near`
+  (composition). Relative depth is normalized per image, so every
+  statistic is deliberately invariant to that normalization
+  (robust 2nd/98th-percentile scaling); cross-stimulus "mean depth" is
+  never emitted because it would be meaningless. Complements gist's
+  spatial envelope and places' coarse SUN layout attributes with a
+  continuous depth arm. Checkpoint
+  `depth-anything/Depth-Anything-V2-Small-hf` (Apache-2.0 — the Small
+  variant specifically; larger V2 variants are CC-BY-NC and not used).
+  Standard per-image model (stills and video frames). Depth backbones
+  are trained on real scenes: animated/stylized clips are out-of-domain,
+  a covariate rather than ground truth.
+
 ## [0.8.0] - 2026-08-25
 
 ### Added

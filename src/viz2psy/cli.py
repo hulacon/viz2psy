@@ -64,6 +64,7 @@ MODEL_REGISTRY = {
     "yolo": ("viz2psy.models.yolo", "YOLOModel", "80 object counts + 5 summary statistics"),
     "motion": ("viz2psy.models.motion", "MotionModel", "7 optical-flow motion statistics (video only)"),
     "faces": ("viz2psy.models.faces", "FacesModel", "5 face count/size/configuration statistics (YuNet)"),
+    "depth": ("viz2psy.models.depth", "DepthModel", "6 scene-layout statistics from monocular relative depth (Depth Anything V2 small)"),
 }
 
 # Models that read the video itself (temporal structure) rather than the

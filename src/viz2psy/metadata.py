@@ -46,6 +46,7 @@ def get_model_version(model_name: str) -> str:
         "yolo": ("ultralytics", None),
         "motion": ("opencv-python", None),  # analytic Farnebäck flow
         "faces": ("opencv-python", None),  # YuNet via cv2.FaceDetectorYN
+        "depth": ("transformers", None),
     }
 
     pkg, fallback = version_map.get(model_name, (None, "unknown"))
