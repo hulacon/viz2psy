@@ -71,6 +71,12 @@ def model():
 
 
 class TestDepthModel:
+    # Marked, not skipped: `transformers` is not in [project] dependencies --
+    # it lives only in the `caption` extra -- so the two tests that build a real
+    # DepthModel cannot run against a plain `pip install viz2psy`, let alone the
+    # CI dependency subset. The weekly `heavy` job installs it and runs them;
+    # see .github/workflows/ci.yml.
+    @pytest.mark.heavy
     def test_astronaut_outputs_are_sane(self, model):
         from PIL import Image
         from skimage.data import astronaut
@@ -86,6 +92,7 @@ class TestDepthModel:
         # astronaut sits left-of-center, so it comes out slightly negative)
         assert -1.0 <= s["depth_center_near"] <= 1.0
 
+    @pytest.mark.heavy
     def test_batch_matches_single(self, model):
         from PIL import Image
         from skimage.data import astronaut

@@ -73,6 +73,22 @@ Issues = "https://github.com/hulacon/viz2psy/issues"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# --strict-markers, deliberately: a mistyped `@pytest.mark.heayv` on a test is a
+# collection error instead of a mark that silently means nothing, which would
+# leave that test in the pull-request gate without the dependency it needs.
+#
+# It does NOT guard the other half. An unknown name inside a `-m` *expression*
+# is not an error -- pytest evaluates it as False -- so CI's `-m "not heavy"`
+# typoed to `-m "not heayv"` selects everything, heavy tier included (measured
+# 2026-08-29). That direction is loud: those tests then fail on the missing
+# import in a job that never installed it. There is no pytest flag for it.
+addopts = "--strict-markers"
+markers = [
+    "heavy: needs a dependency or checkpoint outside the CI install set (see .github/workflows/ci.yml). Runs weekly in the `heavy` job, never on a pull request.",
+]
+
 [tool.commitizen]
 name = "cz_conventional_commits"
 version = "0.9.0"

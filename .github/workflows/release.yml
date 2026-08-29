@@ -1,0 +1,92 @@
+# PyPI publishing, via trusted publishing (OIDC) rather than a long-lived API
+# token in repository secrets.
+#
+# **This workflow is inert as written, deliberately.** viz2psy is not on PyPI
+# yet and the account that will own it does not exist, so there is nothing for
+# GitHub to exchange its OIDC token against; a run today gets as far as the
+# publish step and fails there. It is committed now because the *shape* is the
+# part worth deciding early — a repo that reaches "we should release this" and
+# then invents a release process under time pressure is how an API token ends up
+# pasted into a secret.
+#
+# To turn it on, in order:
+#   1. Create the PyPI project (the name `viz2psy` is unclaimed as of
+#      2026-08-29) and, on PyPI, add a *pending* trusted publisher for
+#      owner `hulacon`, repo `viz2psy`, workflow `release.yml`,
+#      environment `pypi`.
+#   2. Create the `pypi` GitHub environment in repository settings, with
+#      required reviewers. Without it, anyone with write access can dispatch a
+#      publish; the environment gate is the only approval step in this file.
+#   3. Add the `release:` trigger below, so a GitHub release publishes
+#      automatically and the dispatch path becomes the exception.
+# Until then `workflow_dispatch` alone means it cannot fire on its own and
+# cannot turn a branch red unattended.
+name: Release
+
+on:
+  workflow_dispatch:
+  # Add once step 3 above is done. Kept commented rather than absent so the
+  # intended end state is visible from the file:
+  # release:
+  #   types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Build
+        run: |
+          python -m pip install --upgrade pip build twine
+          python -m build
+          # Catches the metadata problems PyPI rejects *after* upload, when the
+          # version number has already been burned — PyPI does not allow
+          # re-uploading a filename, so a rejected 0.9.0 costs you 0.9.1.
+          python -m twine check dist/*
+
+      - name: Version matches the tag
+        # Only meaningful once the `release:` trigger is on; on a manual
+        # dispatch there is no tag and this is a no-op. commitizen keeps
+        # pyproject and __init__.py in step (see [tool.commitizen] version_files)
+        # but nothing keeps *those* in step with the tag someone typed.
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          python - <<'PY'
+          import os, pathlib, re, sys
+
+          tag = os.environ["GITHUB_REF_NAME"].lstrip("v")
+          wheels = list(pathlib.Path("dist").glob("*.whl"))
+          if len(wheels) != 1:
+              sys.exit(f"expected exactly one wheel in dist/, found {len(wheels)}")
+          built = wheels[0].name.split("-")[1]
+          if built != tag:
+              sys.exit(f"tag v{tag} does not match built version {built} — bump with `cz bump`, do not tag by hand")
+          print(f"tag v{tag} matches built version {built}")
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      # The whole point: this is what lets PyPI verify the run's identity
+      # instead of checking a shared secret. No PYPI_API_TOKEN anywhere.
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

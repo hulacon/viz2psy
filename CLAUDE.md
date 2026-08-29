@@ -132,8 +132,25 @@ pip install -e ".[dev]"
 ## Running Tests
 
 ```bash
-pytest
+pytest                    # everything, including the `heavy` tier
+pytest -m "not heavy"     # what CI gates a pull request on
 ```
+
+The `heavy` marker means "needs a dependency or checkpoint outside the CI
+install set". Today that is `TestDepthModel` alone: `depth` loads through
+`transformers`, which is not in `[project] dependencies` — it appears only in
+the `caption` extra — so a plain `pip install viz2psy` cannot run it either.
+Those tests run in the weekly `heavy` job, not on pull requests.
+
+CI (`.github/workflows/ci.yml`) does **not** `pip install -e .`: the full
+dependency set is the union of thirteen models' needs, and torch alone resolves
+to a 5 GB CUDA build from PyPI. It installs the subset the test suite actually
+imports, with torch from the PyTorch CPU index. The workflow comments carry the
+reasoning; that file is the source of truth for the subset.
+
+There is no lint or type gate yet. `ruff check` reports 197 findings and
+`ruff format --check` would reformat 39 of 54 files (measured 2026-08-29), so
+adding one is its own diff, not a rider on the commit that added CI.
 
 ## Commit Conventions
 
