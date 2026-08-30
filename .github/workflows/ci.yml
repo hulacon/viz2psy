@@ -1,0 +1,216 @@
+# viz2psy's first CI. Scope is deliberately the checks that can pass on a free
+# runner with no GPU and no cluster: the analytic feature maths, the model
+# registry, and the offline video path. Live scoring against real stimulus sets
+# stays a Talapas job — CI cannot replace it and should not pretend to.
+#
+# The one thing that makes this repo hard to gate, and the reason it went nine
+# releases without CI: `src/viz2psy/models/base.py` imports `torch` at module
+# scope, so *every* test module pulls torch in — including the pure-numpy
+# `depth_stats` / `face_stats` classes that never touch a tensor. There is no
+# useful subset that skips torch without refactoring the base class, so CI
+# installs torch and the question becomes *which* torch. See "Install" below.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  # Weekly, for two reasons. It separates "this diff broke it" from "a
+  # dependency moved under us" — this repo floats every bound (`torch>=2.0`,
+  # `opencv-python>=4.8`, ...), so an upstream release can turn main red with
+  # the repo unchanged, and without a scheduled run that failure surfaces on
+  # whatever the next push happens to be. It is also when the `heavy` job below
+  # runs at all.
+  #
+  # Monday 15:17 UTC — start of the working week in Eugene (08:17 PDT / 07:17
+  # PST; cron is always UTC and does not follow DST), off the hour, where
+  # GitHub's scheduler is least congested. Offset from duckbrain's 15:43 so the
+  # two do not queue against each other.
+  #
+  # Two things to know before trusting it: a scheduled failure is reported
+  # against the last commit on main, which did not cause it — read the run's
+  # trigger before the commit. And **GitHub disables a scheduled workflow in a
+  # public repo after 60 days with no repository activity**, so a quiet period
+  # switches this off silently; re-enable from the Actions tab rather than
+  # assuming it has been running.
+  schedule:
+    - cron: "17 15 * * 1"
+
+concurrency:
+  # Keyed on the event as well as the ref so a cron firing mid-push cannot
+  # cancel the run that is reporting on someone's commit — `github.ref` is
+  # `refs/heads/main` for both, so without the event they share a group and
+  # `cancel-in-progress` lets the weekly run kill a real one.
+  group: ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      # The ends of the supported range: 3.10 is the `requires-python` floor,
+      # 3.12 is what the Talapas shared envs run and where a deprecation lands
+      # before it becomes an error. torch 2.13 still ships 3.10 wheels
+      # (`requires_python >=3.10`, checked 2026-08-29); when it drops them this
+      # matrix goes red on the floor leg, and the fix is to raise
+      # `requires-python`, not to pin torch.
+      matrix:
+        python-version: ["3.10", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          # Keyed on this file, not pyproject.toml: the install list below is
+          # the real dependency set for CI, so the cache must invalidate when
+          # *it* changes, not when an unrelated dependency bound moves.
+          cache-dependency-path: .github/workflows/ci.yml
+
+      - name: Install
+        # NOT `pip install -e .`. viz2psy's `dependencies` are the union of
+        # thirteen models' needs — ultralytics, open-clip-torch,
+        # deepgaze-pytorch, resmem, umap-learn — and installing them to run 23
+        # tests would spend most of a runner's disk and minutes on code CI never
+        # executes. So: the exact subset the test suite imports, installed
+        # `--no-deps` on top so a missing one fails loudly here instead of being
+        # papered over by a transitive pull.
+        #
+        # **The `--index-url` is the load-bearing line.** Plain `pip install
+        # torch` on linux resolves the CUDA build and its nvidia-* wheels:
+        # measured 2026-08-29 at **5.0 GB installed** (torch 2.13.0+cu130) in a
+        # container with no GPU. That is the "torch won't fly on free runners"
+        # problem, and it is entirely a wheel-choice problem — the CPU index
+        # serves the same torch without the CUDA payload. Nothing here needs a
+        # GPU; the tests that touch a model run it on CPU explicitly.
+        #
+        # Each package below is a *subset of* `[project] dependencies`, never an
+        # addition — CI must not test against a dependency set users do not get:
+        #   torch          base.py imports it at module scope (see header)
+        #   numpy, Pillow  every model module
+        #   pandas, tqdm   viz2psy/__init__ -> pipeline
+        #   opencv-python  motion (Farneback flow, and the test video writer)
+        #                  and faces (YuNet via cv2.FaceDetectorYN)
+        #   scikit-image   skimage.data.astronaut, the deterministic real-face
+        #                  asset the faces integration test scores
+        run: |
+          python -m pip install --upgrade pip
+          pip install --index-url https://download.pytorch.org/whl/cpu torch
+          pip install numpy Pillow pandas tqdm opencv-python scikit-image pytest
+          pip install --no-deps -e .
+
+      - name: Import check
+        # Cheap, and it catches what the test suite structurally cannot: nine of
+        # the thirteen model modules and the whole viz/ subpackage are never
+        # imported by any test, so a syntax error in one ships green. This is
+        # the only check in CI that looks at them at all.
+        #
+        # Deliberately not `python -m compileall -q src/`: that prints "Can't
+        # list 'src/'" and **exits 0** when the path is wrong, so the day the
+        # layout moves the step keeps passing while checking nothing. Assert the
+        # tree is there before trusting a green compile.
+        run: |
+          python -c "import viz2psy; print('viz2psy', viz2psy.__version__)"
+          python - <<'PY'
+          import compileall, pathlib, sys
+
+          models = sorted(pathlib.Path("src/viz2psy/models").glob("*.py"))
+          if len(models) < 10:
+              sys.exit(f"only {len(models)} model modules under src/viz2psy/models — layout moved?")
+          print(f"compiling {len(models)} model modules + package")
+          sys.exit(0 if compileall.compile_dir("src", quiet=1) else 1)
+          PY
+
+      - name: Model registry is importable
+        # The registry is lazy by design (viz2psy/models/__init__.py and the
+        # MODEL_REGISTRY table in cli.py both defer the import), which is what
+        # lets a user install viz2psy without ultralytics and still run resmem.
+        # The cost is that a typo in a registry entry — a renamed class, a moved
+        # module — is invisible until someone asks for that model. Resolving
+        # every entry that CI has the dependencies for turns that into a gate.
+        # Entries whose backend is not in the install set above are expected to
+        # fail here and are reported, not fatal.
+        run: |
+          python - <<'PY'
+          from viz2psy.cli import MODEL_REGISTRY, _load_model_class
+
+          missing = []
+          for name in MODEL_REGISTRY:
+              try:
+                  cls = _load_model_class(name)
+              except ImportError as e:
+                  # Split the two ImportErrors that look identical from here. A
+                  # typo in the registry's module path ("viz2psy.models.dpeth")
+                  # is a ModuleNotFoundError naming a viz2psy module, and is
+                  # exactly the defect this step exists to catch -- filing it
+                  # under "backend not installed" would hide it forever. Anything
+                  # else missing is a third-party backend CI did not install.
+                  if (getattr(e, "name", "") or "").startswith("viz2psy"):
+                      raise SystemExit(f"registry entry {name!r} points at a module that does not exist: {e}")
+                  missing.append(f"{name}: {e}")
+              except Exception as e:
+                  raise SystemExit(f"registry entry {name!r} is broken: {e!r}")
+              else:
+                  print(f"  {name} -> {cls.__name__}")
+          if missing:
+              print("\nnot resolvable with the CI dependency subset (expected):")
+              for m in missing:
+                  print(f"  {m}")
+          PY
+
+      - name: Tests
+        # `-m "not heavy"` drops the tier that needs a dependency outside the
+        # install set above; see the `heavy` job.
+        #
+        # A typo here does not go quiet: an unknown name in a `-m` expression is
+        # not an error, pytest evaluates it as False, so `not heayv` selects
+        # *everything* and the heavy tests fail on the missing transformers
+        # import in a job that never installed it. Over-selection, not
+        # under-selection — the safe direction, and the only one available:
+        # `--strict-markers` covers the mark on the test, not this expression.
+        #
+        # `-rs` so a skip that appears later prints its reason in the log rather
+        # than as a bare `s`.
+        #
+        # Measured 2026-08-29 on 3.11: 23 passed, 2 deselected.
+        run: pytest tests/ -q -m "not heavy" -rs
+
+  heavy:
+    # The tier the `test` job deselects: TestDepthModel, which needs
+    # `transformers` plus a ~100 MB checkpoint from the Hugging Face hub.
+    #
+    # A separate job rather than `continue-on-error` on the step above. An
+    # advisory check is one nobody reads; this one is blocking when it runs, and
+    # it runs on the weekly cron and on demand rather than on every pull request
+    # — a 100 MB download is not worth paying for a docstring fix, but a tier
+    # that never runs is a tier that rots, which is the whole reason it is here
+    # on a schedule instead of behind a comment saying "run these locally".
+    #
+    # **A red run here is most likely a packaging bug, not a test bug.** `depth`
+    # is a registered core model whose `load()` imports `transformers`, but
+    # `transformers` is not in `[project] dependencies` — it appears only in the
+    # `caption` extra. So `pip install viz2psy` gives a user a depth model that
+    # cannot load, and this job has to install transformers by hand to exercise
+    # it. Fixing that (a `depth` extra, or moving transformers to core) is a
+    # packaging decision, deliberately not made in the commit that added CI.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: .github/workflows/ci.yml
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install --index-url https://download.pytorch.org/whl/cpu torch
+          pip install numpy Pillow pandas tqdm opencv-python scikit-image pytest transformers
+          pip install --no-deps -e .
+      - name: Tests (heavy tier)
+        run: pytest tests/ -q -m heavy -rs
