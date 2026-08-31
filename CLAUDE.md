@@ -137,10 +137,13 @@ pytest -m "not heavy"     # what CI gates a pull request on
 ```
 
 The `heavy` marker means "needs a dependency or checkpoint outside the CI
-install set". Today that is `TestDepthModel` alone: `depth` loads through
-`transformers`, which is not in `[project] dependencies` — it appears only in
-the `caption` extra — so a plain `pip install viz2psy` cannot run it either.
-Those tests run in the weekly `heavy` job, not on pull requests.
+install set". Today that is `TestDepthModel` alone: it downloads a ~100 MB
+checkpoint and needs `transformers`, which the light CI tier deliberately does
+not install. (`transformers` moved into `[project] dependencies` 2026-09-01 —
+every registered model now loads on a bare `pip install viz2psy`, and the
+former `caption` extra is gone — so this is a CI-cost boundary only, no longer
+a packaging gap.) Those tests run in the weekly `heavy` job, not on pull
+requests.
 
 CI (`.github/workflows/ci.yml`) does **not** `pip install -e .`: the full
 dependency set is the union of thirteen models' needs, and torch alone resolves

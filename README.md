@@ -28,7 +28,6 @@ pip install -e .
 Two models need optional extras (their dependencies are not installed by default):
 
 ```bash
-pip install "viz2psy[caption] @ git+https://github.com/hulacon/viz2psy"   # BLIP captions (transformers)
 pip install "viz2psy[ebind] @ git+https://github.com/hulacon/viz2psy"     # EBind embeddings
 ```
 
