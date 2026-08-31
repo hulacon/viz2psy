@@ -35,6 +35,10 @@ classifiers = [
 dependencies = [
     "torch>=2.0",
     "torchvision>=0.15",
+    # Backs two registered models (caption/BLIP, depth/Depth Anything V2).
+    # Core rather than an extra so every registered model loads on a bare
+    # install -- decided 2026-09-01, retiring the "depth cannot load" flag.
+    "transformers>=4.40",
     "Pillow>=9.0",
     "pandas>=1.5",
     "tqdm>=4.60",
@@ -56,7 +60,6 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest", "ipython", "commitizen>=3.12"]
-caption = ["transformers>=4.40"]
 ebind = ["ebind @ git+https://github.com/encord-team/ebind"]
 interactive = ["plotly>=5.18", "kaleido>=0.2"]
 hypertools = ["hypertools>=0.8"]

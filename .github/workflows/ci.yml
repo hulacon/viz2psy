@@ -190,13 +190,13 @@ jobs:
     # that never runs is a tier that rots, which is the whole reason it is here
     # on a schedule instead of behind a comment saying "run these locally".
     #
-    # **A red run here is most likely a packaging bug, not a test bug.** `depth`
-    # is a registered core model whose `load()` imports `transformers`, but
-    # `transformers` is not in `[project] dependencies` — it appears only in the
-    # `caption` extra. So `pip install viz2psy` gives a user a depth model that
-    # cannot load, and this job has to install transformers by hand to exercise
-    # it. Fixing that (a `depth` extra, or moving transformers to core) is a
-    # packaging decision, deliberately not made in the commit that added CI.
+    # The packaging gap this job used to flag is closed: `transformers` moved
+    # into `[project] dependencies` on 2026-09-01, so every registered model
+    # loads on a bare `pip install viz2psy`, and this job's transformers line
+    # is a subset of `dependencies` like everything else CI installs — no
+    # longer the one hand-added exception. A red run here now means a real
+    # break: the checkpoint download, a transformers/torchvision API move, or
+    # the model code itself.
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
