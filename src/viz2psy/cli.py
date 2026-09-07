@@ -970,6 +970,16 @@ def main():
         ),
     )
     parser.add_argument(
+        "--id-pattern",
+        default=None,
+        help=(
+            "Per-row stimulus_id for HDF5 bricks, as a format string over the "
+            "brick index: {idx} is the 0-based image_idx, {idx1} the 1-based "
+            "one (e.g. 'ext-nsd-{idx1:06d}'). Overrides --stimulus-id for "
+            "HDF5 input; ignored for images and video."
+        ),
+    )
+    parser.add_argument(
         "--all",
         action="store_true",
         help="Run all available models.",
@@ -1201,7 +1211,14 @@ def main():
         # filename stem per image row; the input file's stem for video/HDF5
         # (where `time` / `image_idx` disambiguates rows).
         if "stimulus_id" not in result_df.columns:
-            if args.stimulus_id is not None:
+            if args.id_pattern is not None and "image_idx" in result_df.columns:
+                # One brick, many stimuli: a corpus-namespaced id per row
+                # (Contract B: ids must be the corpus's own, never the file's).
+                sid = [
+                    args.id_pattern.format(idx=int(i), idx1=int(i) + 1)
+                    for i in result_df["image_idx"]
+                ]
+            elif args.stimulus_id is not None:
                 sid = args.stimulus_id
             elif "filename" in result_df.columns:
                 sid = [Path(str(f)).stem for f in result_df["filename"]]

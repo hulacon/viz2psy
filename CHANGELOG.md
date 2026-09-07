@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.1] - 2026-09-07
+
+### Added
+
+- `--id-pattern` for HDF5 bricks: a format string over the brick index
+  (`{idx}` 0-based, `{idx1}` 1-based) that stamps a per-row `stimulus_id`,
+  e.g. `--id-pattern 'ext-nsd-{idx1:06d}'`. Until now an HDF5 run could only
+  carry one constant id for every row, so a brick of 73,000 stimuli could
+  not be scored into Contract B's per-stimulus identity without a post-hoc
+  rewrite. Overrides `--stimulus-id` for HDF5 input; ignored otherwise.
+
 ## [0.9.0] - 2026-08-25
 
 ### Added
