@@ -16,6 +16,14 @@ from .base import BaseModel
 
 _DEFAULT_GRID_SIZE = 24
 
+#: Pixel budget per forward pass. DeepGaze IIE runs four full-resolution
+#: backbones, so its activation footprint scales with pixels x batch: a
+#: 64-frame batch of SD video (720x360) fits a 40 GB device, the same batch
+#: of 1920x800 film does not. predict_batch() splits the caller's batch so
+#: that batch_size x H x W stays under this budget (about 46 SD frames, 7
+#: at 1920x800, 5 at 1080p). Sub-batching does not change any value.
+_PIXEL_BUDGET = 12_000_000
+
 
 class SaliencyModel(BaseModel):
     """DeepGaze IIE saliency model with 24x24 spatial grid output.
@@ -99,7 +107,14 @@ class SaliencyModel(BaseModel):
             return [self.predict(img) for img in images]
 
         h, w = arrays[0].shape[:2]
+        per = max(1, _PIXEL_BUDGET // (h * w))
+        results: list[dict[str, float]] = []
+        for start in range(0, len(arrays), per):
+            results.extend(self._predict_arrays(arrays[start : start + per], h, w))
+        return results
 
+    def _predict_arrays(self, arrays: list[np.ndarray], h: int, w: int) -> list[dict[str, float]]:
+        """One forward pass over same-shaped (H, W, 3) uint8 arrays."""
         batch = torch.tensor(
             np.stack([a.transpose(2, 0, 1) for a in arrays]),
             dtype=torch.float32,

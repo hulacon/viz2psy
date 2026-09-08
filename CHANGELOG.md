@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.2] - 2026-09-08
+
+### Fixed
+
+- `saliency` no longer runs out of GPU memory on high-resolution video.
+  DeepGaze IIE's activation footprint scales with pixels x batch, so a
+  64-frame batch that fits for 720x360 video overflowed a 40 GB device at
+  1920x800. `predict_batch` now splits the caller's batch under a fixed
+  pixel budget (`_PIXEL_BUDGET`, 12 M pixels per forward pass). Values are
+  unchanged; only the forward-pass grouping differs.
+
 ## [0.9.1] - 2026-09-07
 
 ### Added
