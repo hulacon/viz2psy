@@ -156,6 +156,21 @@ def _ppca_em(
     return Z, W, sigma2, var_explained
 
 
+def _mds_kwargs(metric: bool) -> dict:
+    """MDS keyword arguments for the installed scikit-learn.
+
+    scikit-learn 1.8 renamed ``metric`` to ``metric_mds`` and added ``init``;
+    1.8+ dropped Python 3.10, so a 3.10 install gets <=1.7 and the old names.
+    """
+    import inspect
+
+    from sklearn.manifold import MDS
+
+    if "metric_mds" in inspect.signature(MDS.__init__).parameters:
+        return {"metric_mds": metric, "init": "random"}
+    return {"metric": metric}
+
+
 def compute_projection(
     X: np.ndarray,
     method: str = "pca",
@@ -316,11 +331,10 @@ def compute_projection(
 
         projector = MDS(
             n_components=n_components,
-            metric_mds=True,
             random_state=random_state,
             normalized_stress="auto",
             n_init=1,
-            init="random",
+            **_mds_kwargs(metric=True),
         )
         X_proj = projector.fit_transform(X_scaled)
 
@@ -345,11 +359,10 @@ def compute_projection(
 
         projector = MDS(
             n_components=n_components,
-            metric_mds=False,  # Non-metric MDS
             random_state=random_state,
             normalized_stress="auto",
             n_init=1,
-            init="random",
+            **_mds_kwargs(metric=False),
         )
         X_proj = projector.fit_transform(X_scaled)
 
