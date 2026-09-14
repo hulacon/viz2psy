@@ -416,13 +416,27 @@ def cmd_hyperplot(args):
 def cmd_dashboard(args):
     """Create interactive model-visualization dashboard."""
     from .dashboard import create_dashboard
+    from .merge import collect_feature_csvs, load_and_merge
     from .sidecar import load_sidecar, UnifiedImageResolver
 
-    df = pd.read_csv(args.input)
-    df = apply_legacy_renames(df)
-    sidecar = load_sidecar(args.input)
+    # Expand directories so sidecar/resolver anchoring sees real CSV paths.
+    inputs = []
+    for p in args.input:
+        inputs.extend(collect_feature_csvs(p) if p.is_dir() else [p])
 
-    print(f"Creating dashboard for {args.input}...")
+    if len(inputs) == 1:
+        df = apply_legacy_renames(pd.read_csv(inputs[0]))
+    else:
+        # Pass the raw args so directory-collected files keep their
+        # lenient (skippable) status inside the merge.
+        df = load_and_merge(args.input, tolerance=args.merge_tolerance)
+        print(f"Merged {len(inputs)} candidate feature files:")
+        for p in inputs:
+            print(f"  {p}")
+    anchor = inputs[0]
+    sidecar = next((s for s in map(load_sidecar, inputs) if s), None)
+
+    print(f"Creating dashboard for {anchor if len(inputs) == 1 else anchor.parent}...")
     print(f"Rows: {len(df):,}, Columns: {len(df.columns)}")
 
     # Create image resolver if images are available
@@ -430,7 +444,7 @@ def cmd_dashboard(args):
     if not args.no_images:
         try:
             image_resolver = UnifiedImageResolver(
-                csv_path=args.input,
+                csv_path=anchor,
                 sidecar=sidecar,
                 image_root=Path(args.image_root) if args.image_root else None,
                 video_path=Path(args.video_path) if args.video_path else None,
@@ -454,8 +468,11 @@ def cmd_dashboard(args):
     # Determine output path
     if args.output:
         output_path = args.output
+    elif len(inputs) == 1:
+        output_path = _default_output_path(anchor, "dashboard")
+        print(f"(Tip: use -o to specify output path)")
     else:
-        output_path = _default_output_path(args.input, "dashboard")
+        output_path = anchor.parent / "combined_dashboard.html"
         print(f"(Tip: use -o to specify output path)")
 
     with open(output_path, "w") as f:
@@ -739,8 +756,15 @@ def main():
 
     # dashboard (interactive model-visualization explorer)
     p_dash = subparsers.add_parser("dashboard", help="Interactive model-visualization dashboard")
-    p_dash.add_argument("input", type=Path, help="CSV file with scores")
+    p_dash.add_argument("input", type=Path, nargs="+",
+                       help="Feature CSV(s), or a directory of per-model CSVs; "
+                            "multiple inputs are merged on stimulus_id (+ time) "
+                            "into one all-models dashboard")
     p_dash.add_argument("-o", "--output", type=Path, help="Output HTML path")
+    p_dash.add_argument("--merge-tolerance", type=float, default=None,
+                       help="Nearest-time match window when merging inputs on "
+                            "mismatched time grids (default: half the densest "
+                            "input's sampling step)")
     p_dash.add_argument("--width", type=int, default=900, help="Plot width in pixels (default: 900)")
     p_dash.add_argument("--height", type=int, default=600, help="Plot height in pixels (default: 600)")
     p_dash.add_argument("--image-root", type=str, help="Base directory for image lookup")

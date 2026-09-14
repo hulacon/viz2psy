@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `viz2psy-viz dashboard` accepts multiple feature CSVs, or a directory of
+  per-model CSVs, and merges them into one all-models dashboard
+  (`viz2psy.viz.merge`). Static tables merge on `stimulus_id`; time-indexed
+  tables merge exactly on a shared grid or to the nearest spine row within
+  half the sampling step (`--merge-tolerance` overrides). The same model
+  run on two inputs (e.g. model vs. human captions) gets `__<source>`
+  column suffixes; directory-collected tables that cannot merge 1:1 are
+  skipped with a note.
+
 ## [0.9.2] - 2026-09-08
 
 ### Fixed
