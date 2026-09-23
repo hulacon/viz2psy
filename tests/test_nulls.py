@@ -31,7 +31,17 @@ def _nan_keys(row: dict) -> set[str]:
 
 @pytest.mark.parametrize("model", sorted(MODEL_REGISTRY))
 def test_every_model_declares_well_formed_nulls(model):
-    for col, entry in declared_nulls(model).items():
+    # `nulls` lives on the model class, so reading it imports the model's
+    # backend. CI installs only a subset (see ci.yml "Model registry is
+    # importable"): skip a missing third-party backend, but fail a missing
+    # viz2psy module -- that is a broken registry entry, not a missing dep.
+    try:
+        nulls = declared_nulls(model)
+    except ImportError as e:
+        if (getattr(e, "name", "") or "").startswith("viz2psy"):
+            raise
+        pytest.skip(f"{model}: backend not installed ({e})")
+    for col, entry in nulls.items():
         assert set(entry) == {"means", "when"}, col
         assert entry["means"] in KINDS, col
         assert entry["when"].strip(), col
