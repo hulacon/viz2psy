@@ -7,7 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-09-23
+
 ### Added
+
+- **Contract B schema 1.1 (`nulls`):** every model entry in the sidecar
+  carries `nulls`, mapping each column the model can set to NaN to
+  `{"means", "when"}` (constellation-contracts §4.1). Declared on the model
+  class (`BaseModel.nulls`, `{}` = never null), stamped in
+  `MetadataBuilder.add_model` filtered to the emitted columns, and never
+  swallowed on a lookup error (a silent `{}` would be a false "never null").
+  `faces`: `center_dist` (no face) and `mutual_dist` (< 2 faces), `undefined`.
+  `motion`: six flow statistics `undefinable` at a timestamp with no next
+  native frame (the video's end), `motion_coherence` `undefined` (no motion
+  has no direction). `schema_version` is now `"1.1"`.
+- `viz2psy sidecar refresh PATH... [--dry-run]`: rewrites existing sidecars to
+  1.1 in place (JSON only, never the CSV), checking each model's columns in the
+  recorded output table and refusing a sidecar with NaN in an undeclared column.
+- `tests/test_nulls.py`: the producer-duty contract test (no face, one face,
+  a static video pair, a timestamp past the video's end; refresh round-trip).
 
 - `viz2psy-viz dashboard` accepts multiple feature CSVs, or a directory of
   per-model CSVs, and merges them into one all-models dashboard

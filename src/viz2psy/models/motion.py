@@ -59,6 +59,21 @@ class MotionModel(BaseModel):
     """Dense optical-flow statistics between native-adjacent frame pairs."""
 
     name = "motion"
+    # One column, one kind (§4.1). The six flow/difference statistics are
+    # positional nulls: a timestamp with no NEXT native frame (the video's
+    # end; a read failure takes the same path) has no pair to compare.
+    # Coherence is also null on a static pair, which is content, so it is
+    # declared undefined; its end-of-video NaN sits in a row the undefinable
+    # siblings already exclude.
+    nulls = {
+        **{c: {"means": "undefinable",
+               "when": "no next native frame at this timestamp: the video's last grid "
+                       "time(s), or (rarely) a frame read failure"}
+           for c in FEATURE_NAMES if c != "motion_coherence"},
+        "motion_coherence": {"means": "undefined",
+                             "when": "mean flow magnitude <= COHERENCE_MIN_ENERGY: no motion "
+                                     "has no direction (also NaN on the end-of-video row)"},
+    }
     checkpoint = None  # analytic (Farnebäck dense flow), no learned weights
     video_only = True
 

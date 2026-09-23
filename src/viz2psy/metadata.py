@@ -77,6 +77,20 @@ def get_model_contract(model_name: str) -> tuple[str | None, list[str]]:
         return None, []
 
 
+SCHEMA_VERSION = "1.1"  # Contract B §4.1 extractor output convention
+
+
+def declared_nulls(model_name: str) -> dict[str, dict[str, str]]:
+    """The model's Contract B 1.1 ``nulls`` map, read from its class.
+
+    Unlike :func:`get_model_contract` this never swallows an error: a silent
+    ``{}`` would be a false claim that the model cannot emit NaN.
+    """
+    from viz2psy.cli import _load_model_class
+
+    return {col: dict(entry) for col, entry in _load_model_class(model_name).nulls.items()}
+
+
 def get_feature_info(model_name: str, feature_names: list[str]) -> dict[str, Any]:
     """Get feature pattern/definition info for a model."""
     count = len(feature_names)
@@ -255,6 +269,8 @@ class MetadataBuilder:
         }
         if extra_prefixes:
             entry["prefixes"] = [model_name] + extra_prefixes
+        emitted = set(feature_names)
+        entry["nulls"] = {c: e for c, e in declared_nulls(model_name).items() if c in emitted}
         self.models[model_name] = entry
         self.model_features[model_name] = feature_names
         self.total_runtime_sec += runtime_sec
@@ -266,7 +282,7 @@ class MetadataBuilder:
         models_with_defs = {k: v for k, v in self.model_features.items() if k in needs_definition}
 
         metadata = {
-            "schema_version": "1.0",
+            "schema_version": SCHEMA_VERSION,
             "extractor": "viz2psy",
             "extractor_version": get_version(),
             "viz2psy_version": get_version(),  # legacy key, one deprecation cycle

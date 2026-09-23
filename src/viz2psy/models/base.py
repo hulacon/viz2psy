@@ -29,6 +29,11 @@ class BaseModel(ABC):
 
     checkpoint: str | None = None
     extra_prefixes: tuple[str, ...] = ()
+    # Contract B §4.1 (schema 1.1): every column this model can set to NaN,
+    # keyed by exact column name, with what the null means (``undefined`` /
+    # ``undefinable`` / ``missing``) and when. ``{}`` is a positive claim that
+    # no column can be null. Stamped into the sidecar by metadata.add_model.
+    nulls: dict[str, dict[str, str]] = {}
 
     def __init__(self, device: str | None = None):
         if device:

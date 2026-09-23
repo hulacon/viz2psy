@@ -58,6 +58,10 @@ class FacesModel(BaseModel):
     """Face count/size/configuration via OpenCV FaceDetectorYN (YuNet)."""
 
     name = "faces"
+    nulls = {
+        "faces_center_dist": {"means": "undefined", "when": "no face detected (score >= 0.9)"},
+        "faces_mutual_dist": {"means": "undefined", "when": "fewer than two faces detected (score >= 0.9)"},
+    }
     checkpoint = "opencv_zoo/face_detection_yunet_2023mar"
 
     def __init__(self, weights_path: Path | None = None, device: str | None = None):

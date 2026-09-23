@@ -920,6 +920,10 @@ def _generate_visualizations(
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "sidecar":
+        from viz2psy.sidecar import main as sidecar_main
+
+        sys.exit(sidecar_main(sys.argv[2:]))
     parser = argparse.ArgumentParser(
         description="Extract psychological/perceptual features from images, videos, or HDF5 bricks.",
         formatter_class=argparse.RawDescriptionHelpFormatter,

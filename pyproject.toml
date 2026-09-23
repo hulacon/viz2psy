@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "viz2psy"
-version = "0.9.2"
+version = "0.10.0"
 description = "Extract psychological and perceptual features from images using multiple computational models"
 readme = "README.md"
 license = "MIT"
@@ -94,7 +94,7 @@ markers = [
 
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "0.9.2"
+version = "0.10.0"
 version_files = [
     "pyproject.toml:version",
     "src/viz2psy/__init__.py:__version__",
