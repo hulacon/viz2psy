@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-09-25
+
+### Fixed
+
+- **Interlaced video was scored as one blank frame.** OpenCV's FFmpeg backend
+  cannot convert interlaced frames ("Cannot convert interlaced to progressive
+  frames") and returns `ok=True` with a uniform frame, so every model scored
+  the same image at every timestamp: valid output, silently void. Found on
+  71 interlaced (top-field-first) Friends episodes, where `faces` detected no
+  face in any frame and every CLIP row was identical. Interlaced sources
+  (`video.is_interlaced`, the leading frames' interlaced flag) are now
+  decoded with PyAV through FFmpeg's `yadif` in `send_frame` mode
+  (`video.iter_native_frames`), at the same native frame indices OpenCV
+  addresses. `motion` reads its frame pairs the same way. **Progressive
+  sources take the OpenCV path unchanged**, so their features do not move.
+  Features extracted from interlaced video with ≤ 0.10.0 should be
+  re-extracted.
+
+### Added
+
+- `extract_frames` refuses a clip in which more than half the decoded frames
+  are a single uniform colour (`VideoError`), so a decoder failure of this
+  kind fails loudly instead of emitting; and a clip of ≥ 10 sampled frames
+  in which more than 90 % are bit-identical to the previous sample (a
+  decoder returning one stale picture; the interlaced MPEG-2 synthetic fails
+  this way under OpenCV).
+- `av>=12` (PyAV) as a dependency.
+- `tests/test_video_interlaced.py`: an interlaced synthetic that reproduces
+  the OpenCV failure, the deinterlaced path's content, OpenCV-path identity
+  on progressive input, the blank-frame refusal, and `motion` on interlaced
+  input.
+
 ## [0.10.0] - 2026-09-23
 
 ### Added

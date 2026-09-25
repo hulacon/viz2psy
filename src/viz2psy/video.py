@@ -4,6 +4,7 @@ import tempfile
 from pathlib import Path
 
 import cv2
+import numpy as np
 import psutil
 from PIL import Image
 from tqdm import tqdm
@@ -53,6 +54,91 @@ def get_video_info(video_path: Path) -> dict:
         cap.release()
 
 
+#: Leading frames checked for the interlaced flag.
+_INTERLACE_PROBE_FRAMES = 8
+
+#: A clip whose decoded frames are mostly a single uniform colour is refused
+#: rather than scored. OpenCV's FFmpeg backend returns ``ok=True`` with a
+#: blank frame when it cannot convert an interlaced frame ("Cannot convert
+#: interlaced to progressive frames"), and every model then scores that one
+#: image at every timestamp -- valid output, silently void.
+MAX_BLANK_FRAME_FRACTION = 0.5
+
+#: The other face of the same failure: a decoder that hands back one stale,
+#: non-uniform picture for every request. A clip of at least
+#: ``MIN_FRAMES_FOR_FROZEN_CHECK`` sampled frames in which more than this
+#: share are bit-identical to the previous sampled frame is refused. Real
+#: footage carries codec noise between samples 0.5 s apart; a clip that
+#: genuinely never changes is an image, and should be scored as one.
+MAX_FROZEN_FRAME_FRACTION = 0.9
+MIN_FRAMES_FOR_FROZEN_CHECK = 10
+
+
+def is_interlaced(video_path: Path, n_probe: int = _INTERLACE_PROBE_FRAMES) -> bool:
+    """True when any of the stream's leading frames is flagged interlaced."""
+    import av
+
+    try:
+        with av.open(str(video_path)) as container:
+            for i, frame in enumerate(container.decode(video=0)):
+                if frame.interlaced_frame:
+                    return True
+                if i + 1 >= n_probe:
+                    break
+    except av.error.FFmpegError as e:
+        raise VideoError(video_path, f"could not probe for interlacing: {e}") from e
+    return False
+
+
+def iter_native_frames(video_path: Path, indices):
+    """Yield ``(index, rgb_uint8_array)`` for the requested native frame indices.
+
+    For interlaced sources, which OpenCV cannot decode (see
+    ``MAX_BLANK_FRAME_FRACTION``). Decodes sequentially with PyAV through
+    FFmpeg's ``yadif`` deinterlacer in ``send_frame`` mode -- one output frame
+    per input frame, so output index ``n`` is native frame ``n``, the same
+    index ``cap.set(CAP_PROP_POS_FRAMES, n)`` addresses. Indices are yielded
+    in increasing order; indices past the end of the stream are not yielded.
+    """
+    import av
+
+    wanted = sorted({int(i) for i in indices if int(i) >= 0})
+    if not wanted:
+        return
+    want, last = set(wanted), wanted[-1]
+    n = 0
+
+    with av.open(str(video_path)) as container:
+        stream = container.streams.video[0]
+        stream.thread_type = "AUTO"
+        graph = av.filter.Graph()
+        src = graph.add_buffer(template=stream)
+        yadif = graph.add("yadif", "mode=send_frame:parity=auto:deint=all")
+        sink = graph.add("buffersink")
+        src.link_to(yadif)
+        yadif.link_to(sink)
+        graph.configure()
+
+        def drain():
+            nonlocal n
+            while True:
+                try:
+                    out = graph.pull()
+                except (av.BlockingIOError, av.EOFError):
+                    return
+                if n in want:
+                    yield n, out.to_ndarray(format="rgb24")
+                n += 1
+
+        for frame in container.decode(stream):
+            graph.push(frame)
+            yield from drain()
+            if n > last:
+                return
+        graph.push(None)  # flush yadif's one-frame lookahead
+        yield from drain()
+
+
 def estimate_memory_usage(video_info: dict, frame_interval: float) -> int:
     """Estimate memory usage in bytes for extracted frames.
 
@@ -96,11 +182,22 @@ def extract_frames(
     -------
     list of (time, frame)
         Each entry is (timestamp_in_seconds, PIL.Image or Path).
+
+    Raises
+    ------
+    VideoError
+        If more than ``MAX_BLANK_FRAME_FRACTION`` of the decoded frames are a
+        single uniform colour (a decode failure, not a stimulus).
+
+    Progressive sources are read with OpenCV, unchanged. Interlaced sources
+    are deinterlaced and read with PyAV (``iter_native_frames``) at the same
+    native frame indices.
     """
     video_path = Path(video_path)
     if not video_path.exists():
         raise VideoError(video_path, "file not found")
 
+    interlaced = is_interlaced(video_path)
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
         raise VideoError(video_path, "could not open video file")
@@ -127,16 +224,32 @@ def extract_frames(
         if not quiet:
             iterator = tqdm(timestamps, desc="Extracting frames")
 
+        if interlaced:
+            decoded = iter_native_frames(video_path, (int(t * fps) for t in timestamps))
+            pending = next(decoded, None)
+
+        n_blank = n_frozen = 0
+        previous = None
         for t in iterator:
             frame_num = int(t * fps)
-            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
-            ret, frame = cap.read()
+            if interlaced:
+                while pending is not None and pending[0] < frame_num:
+                    pending = next(decoded, None)
+                if pending is None or pending[0] != frame_num:
+                    break
+                frame_rgb = pending[1]
+            else:
+                cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
+                ret, frame = cap.read()
 
-            if not ret:
-                break
+                if not ret:
+                    break
 
-            # Convert BGR (OpenCV) to RGB (PIL)
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                # Convert BGR (OpenCV) to RGB (PIL)
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            n_blank += int(frame_rgb.min() == frame_rgb.max())
+            n_frozen += int(previous is not None and np.array_equal(frame_rgb, previous))
+            previous = frame_rgb
             pil_image = Image.fromarray(frame_rgb)
 
             if save_dir:
@@ -148,6 +261,21 @@ def extract_frames(
             else:
                 frames.append((t, pil_image))
 
+        if frames and n_blank / len(frames) > MAX_BLANK_FRAME_FRACTION:
+            raise VideoError(
+                video_path,
+                f"{n_blank} of {len(frames)} decoded frames are a single uniform colour; "
+                "refusing to score them (a decode failure, e.g. an interlaced source "
+                "the decoder could not convert)",
+            )
+        if (len(frames) >= MIN_FRAMES_FOR_FROZEN_CHECK
+                and n_frozen / (len(frames) - 1) > MAX_FROZEN_FRAME_FRACTION):
+            raise VideoError(
+                video_path,
+                f"{n_frozen} of {len(frames) - 1} sampled frames are bit-identical to the "
+                "previous one; refusing to score a frozen decode (if the video really "
+                "never changes, score it as an image)",
+            )
         return frames
 
     finally:

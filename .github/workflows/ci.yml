@@ -97,10 +97,13 @@ jobs:
         #                  and faces (YuNet via cv2.FaceDetectorYN)
         #   scikit-image   skimage.data.astronaut, the deterministic real-face
         #                  asset the faces integration test scores
+        #   av, psutil     viz2psy.video: PyAV deinterlaces interlaced sources
+        #                  (and writes the interlaced test video); psutil is
+        #                  imported at module scope
         run: |
           python -m pip install --upgrade pip
           pip install --index-url https://download.pytorch.org/whl/cpu torch
-          pip install numpy Pillow pandas tqdm opencv-python scikit-image pytest
+          pip install numpy Pillow pandas tqdm opencv-python scikit-image av psutil pytest
           pip install --no-deps -e .
 
       - name: Import check

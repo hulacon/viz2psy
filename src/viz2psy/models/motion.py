@@ -111,10 +111,31 @@ class MotionModel(BaseModel):
 
             from tqdm import tqdm
 
+            from viz2psy.video import is_interlaced
+
             iterator = times if quiet else tqdm(times, desc=self.name)
+            if is_interlaced(video_path):
+                return self._score_interlaced(video_path, [float(t) for t in iterator], fps)
             return [self._score_pair(cap, float(t), fps) for t in iterator]
         finally:
             cap.release()
+
+    def _score_interlaced(self, video_path: Path, times: list[float], fps: float) -> list[dict[str, float]]:
+        """Interlaced sources: OpenCV cannot decode them, so read the frame
+        pairs deinterlaced through ``viz2psy.video.iter_native_frames``."""
+        from viz2psy.video import iter_native_frames
+
+        cv2 = self.model
+        starts = [int(t * fps) for t in times]
+        needed = set(starts) | {s + 1 for s in starts}
+        gray = {
+            i: self._prepare(cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR))
+            for i, rgb in iter_native_frames(video_path, needed)
+        }
+        return [
+            self._score_gray(gray[s], gray[s + 1], fps) if s in gray and s + 1 in gray else dict(_NAN_ROW)
+            for s in starts
+        ]
 
     def _score_pair(self, cap, t: float, fps: float) -> dict[str, float]:
         cv2 = self.model
@@ -123,9 +144,10 @@ class MotionModel(BaseModel):
         ok_b, frame_b = cap.read()  # sequential read: the next native frame
         if not (ok_a and ok_b):
             return dict(_NAN_ROW)
+        return self._score_gray(self._prepare(frame_a), self._prepare(frame_b), fps)
 
-        gray_a = self._prepare(frame_a)
-        gray_b = self._prepare(frame_b)
+    def _score_gray(self, gray_a: np.ndarray, gray_b: np.ndarray, fps: float) -> dict[str, float]:
+        cv2 = self.model
         flow = cv2.calcOpticalFlowFarneback(
             gray_a, gray_b, None,
             pyr_scale=0.5, levels=3, winsize=15,
