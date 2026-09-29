@@ -109,14 +109,48 @@ class TestInterlacedDecode:
         with pytest.raises(VideoError, match="uniform colour"):
             extract_frames(videos["blank"], frame_interval=0.4, quiet=True)
 
-    def test_frozen_decode_is_refused(self, videos, monkeypatch):
-        """The guard, on the real failure: the interlaced clip forced through OpenCV."""
+    def test_forced_opencv_decode_is_refused(self, videos, monkeypatch):
+        """The guards, on the real failure: the interlaced clip forced through OpenCV.
+
+        Which guard fires is not ours to pin. When swscale refuses the
+        conversion, OpenCV hands back whatever its output buffer already
+        held -- a stale earlier picture (frozen) or a fresh uniform buffer
+        (blank) -- and that varies across builds and runs on identical
+        dependencies. Either refusal is correct; scoring the clip is not.
+        """
         import viz2psy.video as video
         from viz2psy.exceptions import VideoError
 
         monkeypatch.setattr(video, "is_interlaced", lambda *a, **k: False)
-        with pytest.raises(VideoError, match="bit-identical"):
+        with pytest.raises(VideoError, match="bit-identical|uniform colour"):
             video.extract_frames(videos["interlaced"], frame_interval=0.1, quiet=True)
+
+    def test_frozen_decode_is_refused(self, videos, monkeypatch):
+        """The frozen guard, deterministically: a decoder stuck on its first picture."""
+        import cv2
+
+        import viz2psy.video as video
+        from viz2psy.exceptions import VideoError
+
+        real_capture = cv2.VideoCapture
+
+        class StaleCapture:
+            def __init__(self, path):
+                self._cap = real_capture(path)
+                self._first = None
+
+            def __getattr__(self, name):
+                return getattr(self._cap, name)
+
+            def read(self):
+                ok, frame = self._cap.read()
+                if self._first is None:
+                    self._first = frame
+                return ok, self._first.copy()
+
+        monkeypatch.setattr(video.cv2, "VideoCapture", StaleCapture)
+        with pytest.raises(VideoError, match="bit-identical"):
+            video.extract_frames(videos["progressive"], frame_interval=0.1, quiet=True)
 
     def test_moving_clip_is_not_frozen(self, videos):
         from viz2psy.video import extract_frames
