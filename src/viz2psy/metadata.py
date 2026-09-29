@@ -78,6 +78,13 @@ def get_model_contract(model_name: str) -> tuple[str | None, list[str]]:
         return None, []
 
 
+def default_preprocessing(model_name: str) -> dict | None:
+    """The class-default input transform a model declares, or None."""
+    from viz2psy.cli import _load_model_class
+    describe = getattr(_load_model_class(model_name), "describe_preprocessing", None)
+    return describe() if describe else None
+
+
 SCHEMA_VERSION = "1.1"  # Contract B §4.1 extractor output convention
 
 
@@ -268,8 +275,14 @@ class MetadataBuilder:
         """Set device used for inference."""
         self.device = str(device)
 
-    def add_model(self, model_name: str, feature_names: list[str], runtime_sec: float):
-        """Add model info after it completes."""
+    def add_model(self, model_name: str, feature_names: list[str], runtime_sec: float,
+                  preprocessing: dict | None = None):
+        """Add model info after it completes.
+
+        ``preprocessing`` describes an input transform the model applies
+        (e.g. saliency's canonical resize); when omitted, the model class's
+        defaults are recorded if it declares any.
+        """
         checkpoint, extra_prefixes = get_model_contract(model_name)
         package_version = get_model_version(model_name)
         entry = {
@@ -281,6 +294,10 @@ class MetadataBuilder:
         }
         if extra_prefixes:
             entry["prefixes"] = [model_name] + extra_prefixes
+        if preprocessing is None:
+            preprocessing = default_preprocessing(model_name)
+        if preprocessing is not None:
+            entry["preprocessing"] = preprocessing
         emitted = set(feature_names)
         entry["nulls"] = {c: e for c, e in declared_nulls(model_name).items() if c in emitted}
         self.models[model_name] = entry

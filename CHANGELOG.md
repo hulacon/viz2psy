@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-09-29
+
+### Changed
+
+- **`saliency` resizes every input to a canonical pixel area before
+  DeepGaze IIE**: NSD's 425 x 425, at the input's display aspect ratio
+  (`saliency.canonical_size`, bicubic). DeepGaze's output depends on absolute
+  pixel scale. Native 1920 x 800 film frames gave saliency grids ~5x the
+  dimensionality of NSD's, and outside NSD's subspace. At NSD's pixel area,
+  with the aspect kept, they fall back to it. The grid stays in frame
+  coordinates. **425 x 425 inputs (NSD) are unchanged, bit for bit**; any
+  other size scores differently from ≤ 0.11.0 and should be re-extracted if
+  it is compared with NSD. `SaliencyModel(canonical_area=None)` keeps the
+  stored pixel count (the old behaviour for square-pixel input).
+- For video, `saliency` also takes the stream's **sample aspect ratio**, so an
+  anamorphic source (e.g. 720 x 480 at 8:9, displayed 4:3) is scored at its
+  display shape. **The other models still score stored pixels.** A framing
+  rule shared by every model is future work.
+
+### Fixed
+
+- **`llstat_rms_contrast` exploded on near-black frames.** It is
+  `luminance std / mean`, unbounded as the mean goes to 0: fades and cuts to
+  black reached ~600 on Friends and ~230 on movie10, against a maximum of 4.1
+  over the 73,000 NSD images. Those rows dominated any projection that
+  whitens llstat. It is now **NaN (declared `undefined`) below a mean
+  luminance of 0.005** (`llstat.LUMINANCE_FLOOR`), the smallest floor that
+  bounds it on those corpora and drops no NSD image. The old `0.0` for an
+  exactly black image, a created value, is gone too.
+- `llstat_hf_energy` / `llstat_lf_energy` on an all-black image were a created
+  `0.5 / 0.5`. They are now NaN, declared `undefined`.
+- llstat features extracted with ≤ 0.11.0 on video with dark frames should be
+  re-extracted. NSD images are unchanged.
+
+### Added
+
+- `video.get_pixel_aspect` and `pixel_aspect` in `video.get_video_info`
+  (via PyAV; 1.0 when undeclared).
+- A `preprocessing` entry in the sidecar for a model that declares an input
+  transform (`describe_preprocessing`; now `saliency`): canonical area,
+  pixel aspect, interpolation.
+- `vgg19` (torchvision VGG19, per-channel spatial means; added after 0.11.0,
+  see its commit).
+
 ## [0.11.0] - 2026-09-25
 
 ### Fixed

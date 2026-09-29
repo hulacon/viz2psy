@@ -226,12 +226,30 @@ def _process_single_model_images(
     return (model_name, all_scores, feature_names, elapsed, device_used)
 
 
+def _video_model(model_name: str, device: str | None, pixel_aspect: float = 1.0):
+    """A model for video frames. A model that declares an input transform
+    (``describe_preprocessing``; saliency) also gets the stream's pixel aspect,
+    so it sees the frame at its display shape. Other models score stored pixels."""
+    model_cls = _load_model_class(model_name)
+    kwargs = {"device": device} if device else {}
+    if pixel_aspect != 1.0 and hasattr(model_cls, "describe_preprocessing"):
+        kwargs["pixel_aspect"] = pixel_aspect
+    return model_cls(**kwargs)
+
+
+def _video_preprocessing(model_name: str, pixel_aspect: float) -> dict | None:
+    """The sidecar's ``preprocessing`` entry for a model run on video frames."""
+    describe = getattr(_load_model_class(model_name), "describe_preprocessing", None)
+    return describe(pixel_aspect=pixel_aspect) if describe else None
+
+
 def _process_single_model_video(
     model_name: str,
     image_paths: list[Path],
     batch_size: int,
     device: str | None,
     quiet: bool,
+    pixel_aspect: float = 1.0,
 ) -> tuple[str, list[dict], list[str], float, str]:
     """Worker function to process video frames with a single model.
 
@@ -241,8 +259,7 @@ def _process_single_model_video(
     from tqdm import tqdm
     from viz2psy.utils import load_image
 
-    model_cls = _load_model_class(model_name)
-    model = model_cls(device=device) if device else model_cls()
+    model = _video_model(model_name, device, pixel_aspect)
 
     if not quiet:
         print(f"[{model_name}] Loading on {model.device}...")
@@ -533,11 +550,15 @@ def _process_video(
     )
 
     video_info = get_video_info(video_path)
+    pixel_aspect = video_info["pixel_aspect"]
     if not quiet:
         print(f"Video: {video_path.name}")
         print(f"  Duration: {video_info['duration']:.1f}s, "
               f"Resolution: {video_info['width']}x{video_info['height']}, "
               f"FPS: {video_info['fps']:.1f}")
+        if video_info["pixel_aspect"] != 1.0:
+            print(f"  Pixel aspect: {video_info['pixel_aspect']:.4f} "
+                  "(saliency resizes to the display aspect; other models score stored pixels)")
 
     # Check memory usage
     estimated_mem = estimate_memory_usage(video_info, frame_interval)
@@ -659,6 +680,7 @@ def _process_video(
                         batch_size,
                         device,
                         quiet,
+                        pixel_aspect,
                     )
                     futures[future] = model_name
 
@@ -687,7 +709,8 @@ def _process_video(
                     result_df[col] = scores_df[col]
 
                 if metadata:
-                    metadata.add_model(model_name, feature_names, elapsed)
+                    metadata.add_model(model_name, feature_names, elapsed,
+                                       preprocessing=_video_preprocessing(model_name, pixel_aspect))
 
             return _merge_video_results(result_df)
 
@@ -705,8 +728,7 @@ def _process_video(
         result_df = pd.DataFrame({"time": times})
 
         for model_name in models:
-            model_cls = _load_model_class(model_name)
-            model = model_cls(device=device) if device else model_cls()
+            model = _video_model(model_name, device, pixel_aspect)
 
             if not quiet:
                 print(f"Loading {model.name} model on {model.device} ...")
@@ -745,7 +767,8 @@ def _process_video(
 
             # Record model metadata
             if metadata:
-                metadata.add_model(model_name, feature_names, elapsed)
+                metadata.add_model(model_name, feature_names, elapsed,
+                                   preprocessing=_video_preprocessing(model_name, pixel_aspect))
 
         return _merge_video_results(result_df)
 

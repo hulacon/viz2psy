@@ -8,6 +8,13 @@ from skimage.feature import canny
 
 from .base import BaseModel
 
+#: Mean relative luminance (0-1) below which RMS contrast is undefined.
+#: ``std / mean`` is unbounded as the mean goes to 0: near-black film frames
+#: (fades, cuts to black) reach ~600 against a maximum of 4.1 over the 73,000
+#: NSD images. 0.005 (~1.3/255) is the smallest floor that bounds it on the
+#: film corpora checked (friends <= 3.7, movie10 <= 6.9) and drops no NSD image.
+LUMINANCE_FLOOR = 0.005
+
 
 def _luminance(rgb: np.ndarray) -> np.ndarray:
     """Convert RGB (0-1 float) to relative luminance (ITU-R BT.601)."""
@@ -27,8 +34,8 @@ def _spectral_energy_ratio(gray: np.ndarray) -> tuple[float, float]:
     radius = np.sqrt((Y - cy) ** 2 + (X - cx) ** 2)
     median_r = np.median(radius)
     total = power.sum()
-    if total == 0:
-        return 0.5, 0.5
+    if total == 0:  # an all-black image has no spectrum to split
+        return float("nan"), float("nan")
     lf = power[radius <= median_r].sum() / total
     hf = 1.0 - lf
     return float(hf), float(lf)
@@ -54,6 +61,14 @@ class LLStatModel(BaseModel):
     """Low-level image statistics: luminance, contrast, color, frequency, edges."""
 
     name = "llstat"
+    nulls = {
+        "llstat_rms_contrast": {
+            "means": "undefined",
+            "when": f"mean luminance < {LUMINANCE_FLOOR} (near-black image), where std/mean is unbounded",
+        },
+        "llstat_hf_energy": {"means": "undefined", "when": "an all-black image (zero spectral power)"},
+        "llstat_lf_energy": {"means": "undefined", "when": "an all-black image (zero spectral power)"},
+    }
 
     def load(self) -> None:
         """No model to load — all features are computed analytically."""
@@ -66,7 +81,7 @@ class LLStatModel(BaseModel):
         lum = _luminance(rgb)
         lum_mean = float(lum.mean())
         lum_std = float(lum.std())
-        rms_contrast = lum_std / lum_mean if lum_mean > 0 else 0.0
+        rms_contrast = lum_std / lum_mean if lum_mean >= LUMINANCE_FLOOR else float("nan")
 
         # Per-channel RGB stats.
         r_mean, r_std = float(rgb[:, :, 0].mean()), float(rgb[:, :, 0].std())

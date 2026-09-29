@@ -4,6 +4,13 @@ Produces a 24x24 spatial saliency grid per image by pooling the full
 log-density saliency map from DeepGaze IIE into coarse grid cells.
 Output keys use x_y coordinates: saliency_00_00 (top-left) through
 saliency_23_23 (bottom-right), where x is the column and y is the row.
+
+Every input is first resized to a canonical pixel area (NSD's 425 x 425) at
+its display aspect ratio. DeepGaze's output depends on absolute pixel scale:
+the same film frame scored at its native 1920 x 800 has ~5x the saliency
+dimensionality of NSD images, and at NSD's pixel area it falls back to NSD's.
+The grid stays in frame coordinates (the whole frame, undistorted, is pooled
+to 24 x 24).
 """
 
 import numpy as np
@@ -24,6 +31,23 @@ _DEFAULT_GRID_SIZE = 24
 #: at 1920x800, 5 at 1080p). Sub-batching does not change any value.
 _PIXEL_BUDGET = 12_000_000
 
+#: Pixel area every input is resized to before DeepGaze (NSD's 425 x 425).
+CANONICAL_AREA = 425 * 425
+
+
+def canonical_size(width: int, height: int, pixel_aspect: float = 1.0,
+                   area: int | None = CANONICAL_AREA) -> tuple[int, int]:
+    """(width, height) holding ``area`` pixels at the display aspect ratio.
+
+    The display width is ``width * pixel_aspect`` (the stream's sample aspect
+    ratio; 1.0 for square pixels). ``area=None`` keeps the stored pixel count
+    and only corrects the aspect.
+    """
+    display_w = width * pixel_aspect
+    target = width * height if area is None else area
+    scale = (target / (display_w * height)) ** 0.5
+    return max(1, round(display_w * scale)), max(1, round(height * scale))
+
 
 class SaliencyModel(BaseModel):
     """DeepGaze IIE saliency model with 24x24 spatial grid output.
@@ -35,10 +59,36 @@ class SaliencyModel(BaseModel):
     name = "saliency"
     checkpoint = "DeepGazeIIE-pretrained"
 
-    def __init__(self, grid_size: int = _DEFAULT_GRID_SIZE, device: str | None = None):
+    def __init__(self, grid_size: int = _DEFAULT_GRID_SIZE, device: str | None = None,
+                 canonical_area: int | None = CANONICAL_AREA, pixel_aspect: float = 1.0):
         super().__init__(device=device)
         self.grid_size = grid_size
+        self.canonical_area = canonical_area
+        self.pixel_aspect = float(pixel_aspect)
         self._centerbias: np.ndarray | None = None
+
+    @staticmethod
+    def describe_preprocessing(canonical_area: int | None = CANONICAL_AREA,
+                               pixel_aspect: float = 1.0) -> dict:
+        """The input resize, as recorded in the sidecar."""
+        return {
+            "resize": "canonical pixel area at display aspect ratio"
+                      if canonical_area is not None else "display aspect ratio, stored pixel count",
+            "canonical_area": canonical_area,
+            "pixel_aspect": pixel_aspect,
+            "interpolation": "bicubic",
+        }
+
+    def preprocessing(self) -> dict:
+        return self.describe_preprocessing(self.canonical_area, self.pixel_aspect)
+
+    def _prepare(self, image: Image.Image) -> np.ndarray:
+        """RGB array at the canonical size (unchanged when already there)."""
+        image = image.convert("RGB")
+        size = canonical_size(image.width, image.height, self.pixel_aspect, self.canonical_area)
+        if size != image.size:
+            image = image.resize(size, Image.BICUBIC)
+        return np.array(image)
 
     def load(self) -> None:
         import deepgaze_pytorch
@@ -79,7 +129,7 @@ class SaliencyModel(BaseModel):
         return grid.squeeze().cpu().numpy()
 
     def predict(self, image: Image.Image) -> dict[str, float]:
-        img = np.array(image.convert("RGB"))
+        img = self._prepare(image)
         h, w = img.shape[:2]
 
         image_tensor = torch.tensor(img.transpose(2, 0, 1)[None], dtype=torch.float32).to(self.device)
@@ -98,13 +148,13 @@ class SaliencyModel(BaseModel):
 
     def predict_batch(self, images: list[Image.Image]) -> list[dict[str, float]]:
         # DeepGaze expects all images in a batch to have the same resolution.
-        arrays = [np.array(img.convert("RGB")) for img in images]
+        arrays = [self._prepare(img) for img in images]
 
         # Check if all images have the same shape
         shapes = [a.shape[:2] for a in arrays]
         if len(set(shapes)) > 1:
             # Different sizes - fall back to single-image processing
-            return [self.predict(img) for img in images]
+            return [self._predict_arrays([a], *a.shape[:2])[0] for a in arrays]
 
         h, w = arrays[0].shape[:2]
         per = max(1, _PIXEL_BUDGET // (h * w))

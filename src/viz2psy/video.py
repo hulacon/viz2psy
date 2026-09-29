@@ -26,7 +26,8 @@ def get_video_info(video_path: Path) -> dict:
     Returns
     -------
     dict
-        Keys: fps, frame_count, duration, width, height
+        Keys: fps, frame_count, duration, width, height, pixel_aspect
+        (the stream's sample aspect ratio, see :func:`get_pixel_aspect`)
     """
     video_path = Path(video_path)
     if not video_path.exists():
@@ -49,9 +50,28 @@ def get_video_info(video_path: Path) -> dict:
             "duration": duration,
             "width": width,
             "height": height,
+            "pixel_aspect": get_pixel_aspect(video_path),
         }
     finally:
         cap.release()
+
+
+def get_pixel_aspect(video_path: Path) -> float:
+    """The video stream's sample (pixel) aspect ratio; 1.0 when undeclared.
+
+    Frames are decoded at their stored size, so an anamorphic source (e.g.
+    720 x 480 at 8:9, displayed 4:3) reaches the models squeezed. Only
+    ``saliency`` corrects for it (it resizes to the display aspect); the other
+    models score stored pixels.
+    """
+    import av
+
+    try:
+        with av.open(str(video_path)) as container:
+            sar = container.streams.video[0].sample_aspect_ratio
+    except av.error.FFmpegError as e:
+        raise VideoError(video_path, f"could not read the sample aspect ratio: {e}") from e
+    return float(sar) if sar else 1.0
 
 
 #: Leading frames checked for the interlaced flag.

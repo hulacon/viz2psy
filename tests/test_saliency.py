@@ -33,9 +33,23 @@ class _FakeNet:
 
 @pytest.fixture
 def model():
-    m = sal.SaliencyModel(device="cpu")
+    # canonical_area=None keeps the stored pixel count, so the sub-batching
+    # tests see the frame sizes they set up
+    m = sal.SaliencyModel(device="cpu", canonical_area=None)
     m.model = _FakeNet()
     return m
+
+
+class _ShapeNet(_FakeNet):
+    """Also records the (H, W) of every batch."""
+
+    def __init__(self):
+        super().__init__()
+        self.shapes: list[tuple[int, int]] = []
+
+    def __call__(self, batch, centerbias):
+        self.shapes.append(tuple(batch.shape[2:]))
+        return super().__call__(batch, centerbias)
 
 
 def _images(n: int, h: int, w: int) -> list[Image.Image]:
@@ -81,3 +95,89 @@ class TestSubBatching:
         for r in rows:
             assert len(r) == 24 * 24
             assert sum(r.values()) == pytest.approx(1.0, abs=1e-5)
+
+
+class TestCanonicalSize:
+    def test_square_nsd_image_is_unchanged(self):
+        assert sal.canonical_size(425, 425) == (425, 425)
+
+    def test_area_is_nsd_and_aspect_is_kept(self):
+        w, h = sal.canonical_size(1920, 800)
+        assert w / h == pytest.approx(2.4, rel=0.01)
+        assert w * h == pytest.approx(425 * 425, rel=0.01)
+
+    def test_anamorphic_frame_takes_its_display_aspect(self):
+        # 720 x 480 at 8:9 is displayed 4:3, like a square-pixel 640 x 480
+        assert sal.canonical_size(720, 480, pixel_aspect=8 / 9) == sal.canonical_size(640, 480)
+
+    def test_area_none_keeps_the_stored_pixel_count(self):
+        w, h = sal.canonical_size(720, 480, pixel_aspect=8 / 9, area=None)
+        assert w / h == pytest.approx(4 / 3, rel=0.01)
+        assert w * h == pytest.approx(720 * 480, rel=0.01)
+        assert sal.canonical_size(60, 40, area=None) == (60, 40)
+
+
+class TestCanonicalResize:
+    def _model(self, **kw):
+        m = sal.SaliencyModel(device="cpu", **kw)
+        m.model = _ShapeNet()
+        return m
+
+    def test_network_sees_the_canonical_size(self):
+        m = self._model(pixel_aspect=8 / 9)
+        m.predict_batch(_images(2, 480, 720))
+        assert m.model.shapes == [sal.canonical_size(640, 480)[::-1]]
+
+    def test_nsd_sized_input_scores_as_before(self):
+        imgs = _images(2, 425, 425)
+        new, old = self._model(), self._model(canonical_area=None)
+        assert new.predict_batch(imgs) == old.predict_batch(imgs)
+        assert new.model.shapes == [(425, 425)]
+
+    def test_mixed_sizes_share_one_canonical_shape_per_aspect(self):
+        m = self._model()
+        m.predict_batch(_images(1, 480, 640) + _images(1, 240, 320))
+        assert m.model.shapes == [sal.canonical_size(640, 480)[::-1]]
+
+    def test_preprocessing_is_described(self):
+        d = self._model(pixel_aspect=0.5).preprocessing()
+        assert d["canonical_area"] == 425 * 425 and d["pixel_aspect"] == 0.5
+
+
+class TestVideoWiring:
+    def test_only_saliency_gets_the_pixel_aspect(self):
+        from viz2psy.cli import _video_model, _video_preprocessing
+
+        assert _video_model("saliency", "cpu", 8 / 9).pixel_aspect == pytest.approx(8 / 9)
+        assert _video_preprocessing("saliency", 8 / 9)["pixel_aspect"] == pytest.approx(8 / 9)
+        assert _video_preprocessing("llstat", 8 / 9) is None
+
+    def test_sidecar_records_saliency_preprocessing(self):
+        from viz2psy.metadata import MetadataBuilder
+
+        b = MetadataBuilder()
+        b.add_model("saliency", ["saliency_00_00"], 1.0)
+        assert b.models["saliency"]["preprocessing"]["canonical_area"] == 425 * 425
+        b.add_model("saliency", ["saliency_00_00"], 1.0,
+                    preprocessing=sal.SaliencyModel.describe_preprocessing(pixel_aspect=0.75))
+        assert b.models["saliency"]["preprocessing"]["pixel_aspect"] == 0.75
+
+    def test_get_pixel_aspect_reads_the_stream(self, tmp_path):
+        from fractions import Fraction
+
+        av = pytest.importorskip("av")
+        from viz2psy.video import get_pixel_aspect, get_video_info
+
+        path = tmp_path / "anamorphic.mkv"
+        c = av.open(str(path), "w")
+        st = c.add_stream("mpeg2video", rate=25)
+        st.width, st.height, st.pix_fmt = 72, 48, "yuv420p"
+        st.codec_context.sample_aspect_ratio = Fraction(8, 9)
+        for _ in range(10):
+            for pkt in st.encode(av.VideoFrame.from_ndarray(np.zeros((48, 72, 3), np.uint8), format="rgb24")):
+                c.mux(pkt)
+        for pkt in st.encode():
+            c.mux(pkt)
+        c.close()
+        assert get_pixel_aspect(path) == pytest.approx(8 / 9)
+        assert get_video_info(path)["pixel_aspect"] == pytest.approx(8 / 9)

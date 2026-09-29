@@ -117,3 +117,34 @@ class TestRefresh:
         r = refresh_sidecar(side)
         assert r.status == "refused" and r.undeclared == {"llstat": ["llstat_luminance_mean"]}
         assert side.read_text() == before
+
+
+@pytest.mark.parametrize("level, expect", [
+    (0, {"llstat_rms_contrast", "llstat_hf_energy", "llstat_lf_energy"}),  # all black
+    (1, {"llstat_rms_contrast"}),                                          # near black, below the floor
+    (128, set()),                                                          # mid grey
+])
+def test_llstat_nulls_are_declared(level, expect):
+    from PIL import Image
+
+    from viz2psy.models.llstat import LLStatModel
+
+    img = np.full((48, 64, 3), level, np.uint8)
+    if level:
+        img[::2, ::2] = min(255, level + 1)  # a little texture, still near the level
+    row = LLStatModel(device="cpu").predict(Image.fromarray(img))
+    nan = _nan_keys(row)
+    assert nan == expect
+    assert nan <= set(declared_nulls("llstat")) <= set(row)
+
+
+def test_llstat_rms_contrast_is_bounded_just_above_the_floor():
+    from PIL import Image
+
+    from viz2psy.models.llstat import LUMINANCE_FLOOR, LLStatModel
+
+    img = np.zeros((48, 64, 3), np.uint8)
+    img[::4, ::4] = 40  # mean luminance ~0.0098, just above the floor
+    row = LLStatModel(device="cpu").predict(Image.fromarray(img))
+    assert row["llstat_luminance_mean"] >= LUMINANCE_FLOOR
+    assert np.isfinite(row["llstat_rms_contrast"]) and row["llstat_rms_contrast"] < 5
