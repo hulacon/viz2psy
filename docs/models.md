@@ -12,6 +12,7 @@ viz2psy provides wrappers for 12 computational models covering memorability, emo
 | `ebind` | 1024 dims | Semantics | Cross-modal EBind embeddings (shared image–text–audio space) |
 | `caption` | 1 caption | Captioning | Natural language image captions (BLIP) |
 | `dinov2` | 768 dims | Semantics | Self-supervised visual features |
+| `vgg19` | 15,656 dims | Hierarchy | Layerwise ImageNet VGG19 channel means (generic CNN control) |
 | `gist` | 512 dims | Scene | Spatial envelope descriptor |
 | `places` | 467 scores | Scene | Scene categories + attributes |
 | `llstat` | 17 scores | Low-level | Color, contrast, edges, etc. |
@@ -133,6 +134,33 @@ Extracts self-supervised visual features using Meta's DINOv2.
 ```python
 from viz2psy.models.dinov2 import DINOv2Model
 model = DINOv2Model()
+```
+
+### vgg19
+
+Layerwise activations of torchvision's ImageNet VGG19 (`IMAGENET1K_V1`), each
+layer reduced to one value per channel by a spatial mean. A generic
+hierarchical-CNN control, with two layer sets:
+
+- **All 19 layers, pre-ReLU, at 224 px**: `conv1_1` ... `conv5_4`, `fc6`,
+  `fc7`, `fc8` (14,696 values). This is the layer set used for VGG19 feature
+  decoding, read before rectification on images rescaled to 224x224.
+- **Four block outputs, post-ReLU, at 112 px**: `conv1_2`, `conv2_2`,
+  `conv3_3`, `conv4_3` (960 values). These are the VGG block 1-4 embeddings an
+  image-to-fMRI encoder reads at 112x112.
+
+- **Output**: `vgg19_<layer>_<NNNN>` (224 px set) and
+  `vgg19_<layer>_relu112_<NNNN>` (112 px set); 15,656 columns in all
+- **Preprocessing**: the whole image is resized to a square (no crop, aspect
+  ratio not preserved), then ImageNet mean/std normalized
+- **Reduction**: the spatial mean per channel is this wrapper's choice; the
+  full spatial maps are too large to store per image or frame
+- **Reference**: Simonyan, K., & Zisserman, A. (2015). Very deep
+  convolutional networks for large-scale image recognition. *ICLR 2015*.
+
+```python
+from viz2psy.models.vgg19 import VGG19Model, column_names
+model = VGG19Model()
 ```
 
 ---

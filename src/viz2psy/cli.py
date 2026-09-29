@@ -65,6 +65,7 @@ MODEL_REGISTRY = {
     "motion": ("viz2psy.models.motion", "MotionModel", "7 optical-flow motion statistics (video only)"),
     "faces": ("viz2psy.models.faces", "FacesModel", "5 face count/size/configuration statistics (YuNet)"),
     "depth": ("viz2psy.models.depth", "DepthModel", "6 scene-layout statistics from monocular relative depth (Depth Anything V2 small)"),
+    "vgg19": ("viz2psy.models.vgg19", "VGG19Model", "15,656 layerwise VGG19 channel means (19 layers pre-ReLU @224 px + 4 block outputs post-ReLU @112 px)"),
 }
 
 # Models that read the video itself (temporal structure) rather than the

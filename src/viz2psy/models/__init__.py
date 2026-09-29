@@ -19,6 +19,7 @@ def __getattr__(name):
         "AestheticsModel": ".aesthetics",
         "PlacesModel": ".places",
         "YOLOModel": ".yolo",
+        "VGG19Model": ".vgg19",
     }
     if name in _registry:
         import importlib

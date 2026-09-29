@@ -47,6 +47,7 @@ def get_model_version(model_name: str) -> str:
         "motion": ("opencv-python", None),  # analytic Farnebäck flow
         "faces": ("opencv-python", None),  # YuNet via cv2.FaceDetectorYN
         "depth": ("transformers", None),
+        "vgg19": ("torchvision", None),  # checkpoint field names the weights
     }
 
     pkg, fallback = version_map.get(model_name, (None, "unknown"))
@@ -122,6 +123,17 @@ def get_feature_info(model_name: str, feature_names: list[str]) -> dict[str, Any
         return {
             "pattern": "saliency_{XX}_{YY}",
             "range": [[0, 23], [0, 23]],
+            "count": count
+        }
+
+    if model_name == "vgg19" and feature_names and feature_names[0].startswith("vgg19_"):
+        # One {NNNN}-numbered block per layer; see viz2psy.models.vgg19.
+        from viz2psy.models.vgg19 import LAYERS_112, LAYERS_224, layer_width
+        layers = {f"{layer}": layer_width(layer) for layer in LAYERS_224}
+        layers.update({f"{layer}_relu112": layer_width(layer) for layer in LAYERS_112})
+        return {
+            "pattern": "vgg19_{layer}_{NNNN}",
+            "layers": layers,
             "count": count
         }
 

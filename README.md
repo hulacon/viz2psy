@@ -98,6 +98,7 @@ df = score_images(model, ["photo1.jpg", "photo2.jpg"])
 | `motion` | 7 scores | Optical-flow motion statistics — **video only** (energy, coherence, pan/tilt, radial looming, frame difference; Farnebäck flow between native-adjacent frames at each grid timestamp, in frame-heights/s) |
 | `faces` | 5 scores | Face count/size/configuration (OpenCV YuNet): count, total/max area, framing, face clustering |
 | `depth` | 6 scores | Scene layout from monocular relative depth (Depth Anything V2 small): foreground fraction, openness, spread/skew, depth clutter, composition — all invariant to the per-image depth normalization |
+| `vgg19` | 15,656 dims | Layerwise ImageNet VGG19 channel means: all 19 layers pre-ReLU at 224 px, plus conv1_2/conv2_2/conv3_3/conv4_3 post-ReLU at 112 px. A generic hierarchical-CNN control; whole frame resized to a square, no crop |
 
 See [docs/models.md](docs/models.md) for detailed documentation.
 
@@ -147,6 +148,7 @@ models you used:
 - **Colorfulness** (`llstat`): Hasler, D., & Suesstrunk, S. E. (2003). Measuring colorfulness in natural images. *SPIE Human Vision and Electronic Imaging VIII*. [doi:10.1117/12.477378](https://doi.org/10.1117/12.477378)
 - **DeepGaze IIE** (`saliency`): Linardos, A., Kümmerer, M., Press, O., & Bethge, M. (2021). DeepGaze IIE: Calibrated prediction in and out-of-domain for state-of-the-art saliency modeling. *ICCV 2021*. [arXiv:2105.12441](https://arxiv.org/abs/2105.12441)
 - **LAION Aesthetics** (`aesthetics`): Schuhmann, C., et al. (2022). LAION-5B: An open large-scale dataset for training next generation image-text models. *NeurIPS 2022 Datasets and Benchmarks*. [arXiv:2210.08402](https://arxiv.org/abs/2210.08402); predictor head from [improved-aesthetic-predictor](https://github.com/christophschuhmann/improved-aesthetic-predictor)
+- **VGG19** (`vgg19`): Simonyan, K., & Zisserman, A. (2015). Very deep convolutional networks for large-scale image recognition. *ICLR 2015*. [arXiv:1409.1556](https://arxiv.org/abs/1409.1556)
 - **YOLOv8** (`yolo`): Jocher, G., Chaurasia, A., & Qiu, J. (2023). Ultralytics YOLOv8 (software). [github.com/ultralytics/ultralytics](https://github.com/ultralytics/ultralytics)
 
 ## License
