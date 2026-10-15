@@ -50,14 +50,15 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      # The ends of the supported range: 3.10 is the `requires-python` floor,
+      # The ends of the supported range: 3.11 is the `requires-python` floor,
       # 3.12 is what the Talapas shared envs run and where a deprecation lands
-      # before it becomes an error. torch 2.13 still ships 3.10 wheels
-      # (`requires_python >=3.10`, checked 2026-08-29); when it drops them this
-      # matrix goes red on the floor leg, and the fix is to raise
-      # `requires-python`, not to pin torch.
+      # before it becomes an error. The floor was 3.10 until scikit-learn 1.8
+      # dropped it: a 3.10 leg resolves a different sklearn major, whose MDS
+      # kwargs differ, so it was testing a dependency set nobody else runs.
+      # When torch drops 3.11 wheels this matrix goes red on the floor leg, and
+      # the fix is to raise `requires-python`, not to pin torch.
       matrix:
-        python-version: ["3.10", "3.12"]
+        python-version: ["3.11", "3.12"]
 
     steps:
       - uses: actions/checkout@v7
