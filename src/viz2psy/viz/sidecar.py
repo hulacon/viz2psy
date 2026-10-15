@@ -9,6 +9,7 @@ Loads and parses .meta.json sidecar files to provide:
 
 import json
 import re
+import warnings
 from pathlib import Path
 from typing import Any, Union
 import io
@@ -164,7 +165,8 @@ def load_sidecar(csv_path: str | Path) -> SidecarMetadata | None:
         with open(sidecar_path) as f:
             data = json.load(f)
         return SidecarMetadata(data, sidecar_path)
-    except (json.JSONDecodeError, OSError):
+    except (json.JSONDecodeError, OSError) as e:
+        warnings.warn(f"Ignoring unreadable sidecar {sidecar_path}: {e}")
         return None
 
 

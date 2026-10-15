@@ -224,6 +224,7 @@ def compute_projection(
     has_nan = np.any(np.isnan(X))
     if has_nan and method != "ppca":
         warnings.warn("NaN values found, filling with column means. Consider using PPCA for native missing data handling.")
+        X = X.copy()  # impute into our copy, never the caller's array
         col_means = np.nanmean(X, axis=0)
         for i in range(n_features):
             mask = np.isnan(X[:, i])
