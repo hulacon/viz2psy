@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "viz2psy"
-version = "0.12.0"
+version = "0.13.0"
 description = "Extract psychological and perceptual features from images using multiple computational models"
 readme = "README.md"
 license = "MIT"
@@ -59,13 +59,15 @@ dependencies = [
     "scikit-learn>=1.8",
     "umap-learn>=0.5",
     "h5py>=3.8",
+    # The dashboard (viz/dashboard.py) is on by default for every `-o` run.
+    "plotly>=5.18",
     "scipy>=1.10",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest", "ipython", "commitizen>=3.12"]
 ebind = ["ebind @ git+https://github.com/encord-team/ebind"]
-interactive = ["plotly>=5.18", "kaleido>=0.2"]
+interactive = ["kaleido>=0.2"]
 hypertools = ["hypertools>=0.8"]
 
 [project.scripts]
@@ -98,7 +100,7 @@ markers = [
 
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "0.12.0"
+version = "0.13.0"
 version_files = [
     "pyproject.toml:version",
     "src/viz2psy/__init__.py:__version__",

@@ -897,11 +897,11 @@ def _generate_visualizations(
     try:
         from viz2psy.viz.dashboard import create_dashboard
     except ImportError as e:
-        # plotly is the `interactive` extra, not a core dependency. Any other
-        # missing module is a real break, not an optional feature.
+        # plotly is a core dependency; this covers an install that lacks it
+        # anyway. Any other missing module is a real break.
         if not (getattr(e, "name", "") or "").startswith("plotly"):
             raise
-        print(f"Note: dashboard skipped ({e}). Install viz2psy[interactive] "
+        print(f"Note: dashboard skipped ({e}). Install plotly "
               "for it, or pass --no-viz.", file=sys.stderr)
         return
     from viz2psy.viz.sidecar import load_sidecar, UnifiedImageResolver

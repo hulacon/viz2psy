@@ -108,10 +108,7 @@ jobs:
         #   scikit-learn   viz/projection (PCA/t-SNE/MDS), whose kwargs move
         #                  between sklearn majors
         #   h5py           the HDF5 input path of the CLI
-        #   plotly         viz/dashboard. The one package from an extra
-        #                  (`interactive`), not `dependencies`: the dashboard
-        #                  is on by default, so it is what users of that extra
-        #                  run, and without it its tests skip
+        #   plotly         viz/dashboard, on by default for every `-o` run
         run: |
           python -m pip install --upgrade pip
           pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision
