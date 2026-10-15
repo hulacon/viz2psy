@@ -148,3 +148,11 @@ def test_llstat_rms_contrast_is_bounded_just_above_the_floor():
     row = LLStatModel(device="cpu").predict(Image.fromarray(img))
     assert row["llstat_luminance_mean"] >= LUMINANCE_FLOOR
     assert np.isfinite(row["llstat_rms_contrast"]) and row["llstat_rms_contrast"] < 5
+
+
+def test_dinov2_sidecar_pattern_names_real_columns():
+    # The sidecar said `dinov_{NNN}` while the model emits `dinov2_000`...
+    from viz2psy.metadata import get_feature_info
+
+    info = get_feature_info("dinov2", ["dinov2_000", "dinov2_001"])
+    assert info["pattern"].replace("{NNN}", "000") == "dinov2_000"
