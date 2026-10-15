@@ -159,6 +159,25 @@ def iter_native_frames(video_path: Path, indices):
         yield from drain()
 
 
+def sample_times(duration: float, frame_interval: float) -> list[float]:
+    """Sample times 0, interval, 2*interval, ... <= duration.
+
+    Computed as ``i * interval``, not by accumulating ``t += interval``, whose
+    rounding error (0.1 * 10 -> 0.9999999999999999) shifted samples a frame.
+    """
+    n = int(duration / frame_interval + 1e-9) + 1
+    return [round(i * frame_interval, 9) for i in range(n)]
+
+
+def frame_index(t: float, fps: float) -> int:
+    """Index of the frame on screen at time ``t``: floor(t * fps).
+
+    The epsilon absorbs float error in ``t * fps`` (2.3 * 25 is 57.49999...),
+    which plain truncation turned into the previous frame.
+    """
+    return int(t * fps + 1e-6)
+
+
 def estimate_memory_usage(video_info: dict, frame_interval: float) -> int:
     """Estimate memory usage in bytes for extracted frames.
 
@@ -234,24 +253,20 @@ def extract_frames(
             save_dir.mkdir(parents=True, exist_ok=True)
 
         frames = []
-        timestamps = []
-        t = 0.0
-        while t <= duration:
-            timestamps.append(t)
-            t += frame_interval
+        timestamps = sample_times(duration, frame_interval)
 
         iterator = timestamps
         if not quiet:
             iterator = tqdm(timestamps, desc="Extracting frames")
 
         if interlaced:
-            decoded = iter_native_frames(video_path, (int(t * fps) for t in timestamps))
+            decoded = iter_native_frames(video_path, (frame_index(t, fps) for t in timestamps))
             pending = next(decoded, None)
 
         n_blank = n_frozen = 0
         previous = None
         for t in iterator:
-            frame_num = int(t * fps)
+            frame_num = frame_index(t, fps)
             if interlaced:
                 while pending is not None and pending[0] < frame_num:
                     pending = next(decoded, None)

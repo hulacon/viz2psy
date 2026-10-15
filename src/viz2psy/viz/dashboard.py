@@ -383,7 +383,7 @@ def _create_cluster_trace(
     X = df[cols].values.copy()
     try:
         X_proj, info = compute_projection(X, method="mds", n_components=n_components)
-    except Exception as e:
+    except ValueError as e:  # too few rows/features; anything else is a bug
         warnings.warn(f"MDS failed for {model_name}: {e}")
         return None, {}
 
@@ -479,7 +479,7 @@ def _create_trajectory_trace(
     X = df[cols].values.copy()
     try:
         X_2d, info = compute_projection(X, method="pca", n_components=2)
-    except Exception as e:
+    except ValueError as e:  # too few rows/features; anything else is a bug
         warnings.warn(f"PCA failed for {model_name}: {e}")
         return [], {}
 
@@ -581,7 +581,7 @@ def _create_trajectory_animated(
     X = df[cols].values.copy()
     try:
         X_2d, info = compute_projection(X, method="pca", n_components=2)
-    except Exception as e:
+    except ValueError as e:  # too few rows/features; anything else is a bug
         warnings.warn(f"PCA failed for {model_name}: {e}")
         return [], [], {}
 

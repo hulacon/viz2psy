@@ -871,13 +871,11 @@ def _process_images(
         if result_df is None:
             result_df = df
         else:
-            # Merge on filename, adding new score columns
+            # Align by position: every model scores the same image_paths in
+            # order. Not a merge on `filename` -- that is the basename, and
+            # inputs sharing one (sub-01/x.png, sub-02/x.png) cross-joined.
             score_cols = [c for c in df.columns if c != "filename"]
-            result_df = result_df.merge(
-                df[["filename"] + score_cols],
-                on="filename",
-                how="outer",
-            )
+            result_df = pd.concat([result_df, df[score_cols]], axis=1)
 
     return result_df
 
@@ -896,7 +894,16 @@ def _generate_visualizations(
 ):
     """Generate dashboard HTML file after processing."""
     import pandas as pd
-    from viz2psy.viz.dashboard import create_dashboard
+    try:
+        from viz2psy.viz.dashboard import create_dashboard
+    except ImportError as e:
+        # plotly is the `interactive` extra, not a core dependency. Any other
+        # missing module is a real break, not an optional feature.
+        if not (getattr(e, "name", "") or "").startswith("plotly"):
+            raise
+        print(f"Note: dashboard skipped ({e}). Install viz2psy[interactive] "
+              "for it, or pass --no-viz.", file=sys.stderr)
+        return
     from viz2psy.viz.sidecar import load_sidecar, UnifiedImageResolver
 
     sidecar = load_sidecar(output_path)
@@ -1122,8 +1129,10 @@ def main():
     from viz2psy.video import is_video_file
     from viz2psy.metadata import MetadataBuilder
 
-    # Initialize metadata builder (only save if output is specified)
-    metadata = MetadataBuilder() if args.output else None
+    # Initialize metadata builder (only save if output is specified; HDF5
+    # input always writes, to a default path when -o is absent)
+    writes_output = args.output or (len(inputs) == 1 and is_hdf5_file(inputs[0]))
+    metadata = MetadataBuilder() if writes_output else None
 
     # Track input info for viz generation
     input_type = None

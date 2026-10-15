@@ -123,10 +123,10 @@ class MotionModel(BaseModel):
     def _score_interlaced(self, video_path: Path, times: list[float], fps: float) -> list[dict[str, float]]:
         """Interlaced sources: OpenCV cannot decode them, so read the frame
         pairs deinterlaced through ``viz2psy.video.iter_native_frames``."""
-        from viz2psy.video import iter_native_frames
+        from viz2psy.video import frame_index, iter_native_frames
 
         cv2 = self.model
-        starts = [int(t * fps) for t in times]
+        starts = [frame_index(t, fps) for t in times]
         needed = set(starts) | {s + 1 for s in starts}
         gray = {
             i: self._prepare(cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR))
@@ -138,8 +138,10 @@ class MotionModel(BaseModel):
         ]
 
     def _score_pair(self, cap, t: float, fps: float) -> dict[str, float]:
+        from viz2psy.video import frame_index
+
         cv2 = self.model
-        cap.set(cv2.CAP_PROP_POS_FRAMES, int(t * fps))
+        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_index(t, fps))
         ok_a, frame_a = cap.read()
         ok_b, frame_b = cap.read()  # sequential read: the next native frame
         if not (ok_a and ok_b):

@@ -120,7 +120,7 @@ def get_feature_info(model_name: str, feature_names: list[str]) -> dict[str, Any
 
     if model_name == "dinov2" and feature_names and feature_names[0].startswith("dinov"):
         return {
-            "pattern": "dinov_{NNN}",
+            "pattern": "dinov2_{NNN}",
             "range": [0, count - 1],
             "count": count
         }

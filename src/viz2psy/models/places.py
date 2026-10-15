@@ -36,6 +36,17 @@ def _conv3x3(in_planes, out_planes, stride=1):
                      padding=1, bias=False)
 
 
+
+def _parse_categories(text: str) -> list[str]:
+    """Category names from categories_places365.txt.
+
+    ``/a/abbey`` -> ``abbey``; ``/c/church/indoor`` -> ``church_indoor``. Only
+    the leading letter directory is dropped: the qualifier is what keeps
+    church/indoor and church/outdoor (51 classes in all) distinct.
+    """
+    return ["_".join(line.split(" ")[0].strip("/").split("/")[1:])
+            for line in text.strip().splitlines()]
+
 class _BasicBlock(nn.Module):
     expansion = 1
 
@@ -152,14 +163,7 @@ class PlacesModel(BaseModel):
         model.load_state_dict(state_dict)
         self.model = model.eval().to(self.device)
 
-        # Load category labels (strip /a/abbey -> abbey).
-        text = self._download_text(_CATEGORIES_URL)
-        self._categories = []
-        for line in text.strip().splitlines():
-            name = line.split(" ")[0]
-            # Strip leading /x/ path prefix.
-            parts = name.strip("/").split("/")
-            self._categories.append(parts[-1])
+        self._categories = _parse_categories(self._download_text(_CATEGORIES_URL))
 
         # Load SUN attribute labels.
         text = self._download_text(_ATTRIBUTES_URL)

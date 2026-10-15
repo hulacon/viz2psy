@@ -244,10 +244,19 @@ def _merge_timed(frames: dict[str, pd.DataFrame],
         tolerance = _spine_time_step(spine) / 2
 
     spine_grid = set(zip(spine["stimulus_id"], spine["time"]))
+    spine_stimuli = set(spine["stimulus_id"])
     merged = spine
     for name, df in frames.items():
         if name == spine_name:
             continue
+        # Rows join to the spine, so a stimulus it lacks would vanish.
+        missing = set(df["stimulus_id"]) - spine_stimuli
+        if missing:
+            raise ValueError(
+                f"{name} has stimuli absent from the time spine "
+                f"{spine_name}: {sorted(map(str, missing))[:5]}; a timed "
+                "merge would drop them — merge files covering the same stimuli"
+            )
         incoming = _drop_duplicate_carriers(
             merged, df, ["stimulus_id", "time"])
         grid = set(zip(df["stimulus_id"], df["time"]))
@@ -260,7 +269,8 @@ def _merge_timed(frames: dict[str, pd.DataFrame],
                 merged, incoming,
                 on="time", by="stimulus_id",
                 direction="nearest",
-                tolerance=tolerance if tolerance > 0 else None,
+                # 0 (one row per stimulus) means exact, not unbounded.
+                tolerance=tolerance,
             )
     # Row order for the dashboard: per stimulus, time ascending.
     return (merged.sort_values(["stimulus_id", "time"], kind="stable")

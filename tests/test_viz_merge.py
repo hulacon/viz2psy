@@ -131,3 +131,22 @@ class TestFilesystemEntry:
         merged = load_and_merge([tmp_path])
         assert {"alpha_score", "beta_score"} <= set(merged.columns)
         assert len(merged) == 4
+
+
+class TestTimedMergeKeepsData:
+    def test_stimuli_missing_from_spine_are_not_dropped_silently(self):
+        # The spine is the longest input and others join to it left-wise, so
+        # a stimulus absent from the spine vanished from the merge.
+        many = pd.concat([_timed("alpha", [0.0, 0.5, 1.0, 1.5], stim=f"s{i}") for i in range(3)])
+        one_long = _timed("beta", np.arange(0, 10, 0.5), stim="s0")
+        with pytest.raises(ValueError, match="s1"):
+            merge_feature_frames({"a.csv": many, "b.csv": one_long})
+
+    def test_single_frame_spine_does_not_match_any_distance(self):
+        # One row per stimulus gives a spine step of 0, and a 0 tolerance was
+        # turned into "no tolerance": a sample 57 s away was attached.
+        spine = pd.concat([_timed("alpha", [0.0], stim="s0"),
+                           _timed("alpha", [0.0], stim="s1")])
+        far = _timed("beta", [57.0], stim="s0")
+        merged = merge_feature_frames({"a.csv": spine, "b.csv": far})
+        assert merged["beta_score"].isna().all()
