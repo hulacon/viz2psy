@@ -202,13 +202,15 @@ jobs:
     # that never runs is a tier that rots, which is the whole reason it is here
     # on a schedule instead of behind a comment saying "run these locally".
     #
-    # The packaging gap this job used to flag is closed: `transformers` moved
-    # into `[project] dependencies` on 2026-09-01, so every registered model
-    # loads on a bare `pip install viz2psy`, and this job's transformers line
-    # is a subset of `dependencies` like everything else CI installs — no
-    # longer the one hand-added exception. A red run here now means a real
-    # break: the checkpoint download, a transformers/torchvision API move, or
-    # the model code itself.
+    # Unlike `test`, this job installs viz2psy **with its dependencies**: it
+    # runs once a week, so the extra minutes are cheap, and a hand-picked
+    # list here rots silently. That happened on 2026-10-19: a test module
+    # added on 10-15 imports viz2psy.video, which imports psutil at module
+    # scope, and psutil was not on this job's list. pytest imports every
+    # module under tests/ before `-m heavy` deselects anything, so one
+    # missing package fails collection for the whole tier. With the full
+    # install, a red run here means a real break: the checkpoint download, a
+    # transformers/torchvision API move, or the model code itself.
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
@@ -217,17 +219,28 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: .github/workflows/ci.yml
+          # The dependency set comes from pyproject.toml here, so it keys the
+          # cache too.
+          cache-dependency-path: |
+            .github/workflows/ci.yml
+            pyproject.toml
       - name: Install
-        # torchvision rides the CPU-index line with torch: it is a declared
-        # core dependency (`torchvision>=0.15`), transformers' AutoImageProcessor
-        # requires it as a backend (this job's first cron run, 33438310574,
-        # failed exactly there), and installing it from PyPI instead would
-        # resolve the CUDA torch this job exists to avoid.
+        # CPU torch and torchvision first, from the CPU index, for the reason
+        # given in `test`: from PyPI they resolve the CUDA build (~5 GB).
+        # torchvision is a core dependency, and transformers'
+        # AutoImageProcessor needs it as a backend (this job's first cron run,
+        # 33438310574, failed exactly there).
+        #
+        # Then viz2psy with its full dependency set. The constraints file pins
+        # the torch and torchvision just installed, so no dependency can pull
+        # the CUDA build back in; if one needs a different torch, pip fails
+        # here and says so, rather than swapping wheels silently.
         run: |
           python -m pip install --upgrade pip
           pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision
-          pip install numpy Pillow pandas tqdm opencv-python scikit-image pytest transformers
-          pip install --no-deps -e .
+          pip freeze | grep -E '^(torch|torchvision)==' > "$RUNNER_TEMP/torch-cpu.txt"
+          cat "$RUNNER_TEMP/torch-cpu.txt"
+          pip install -c "$RUNNER_TEMP/torch-cpu.txt" -e ".[dev]"
+          python -c "import torch; assert torch.version.cuda is None, torch.__version__; print('torch', torch.__version__)"
       - name: Tests (heavy tier)
         run: pytest tests/ -q -m heavy -rs
