@@ -44,7 +44,12 @@ dependencies = [
     "resmem>=1.1",
     "open-clip-torch>=2.24",
     "scikit-image>=0.21",
-    "deepgaze-pytorch>=1.0",
+    # DeepGaze IIE (the `saliency` model) is not on PyPI under any name; its
+    # only distribution is the upstream repo. A direct reference keeps
+    # saliency in the default install (decided 2026-10-19). PyPI rejects
+    # direct references, so this (and the `ebind` extra) must change before
+    # the first PyPI release (see release.yml).
+    "deepgaze_pytorch @ git+https://github.com/matthias-k/DeepGaze",
     "ultralytics>=8.0",
     "opencv-python>=4.8",
     # Interlaced video: OpenCV cannot decode it (blank frames, ok=True), so
