@@ -20,6 +20,9 @@ from PIL import Image
 from .base import BaseModel
 
 DEFAULT_CHECKPOINT = "encord-team/ebind-full"
+# The hub snapshot of DEFAULT_CHECKPOINT the family's features were extracted
+# with. viz2psy, word2psy and aud2psy pin the same one; change all three together.
+DEFAULT_REVISION = "482831d6cb97d3ffc970f933c614a03aa9891416"
 EMBED_DIM = 1024
 # EBind's config requires image+video+text at minimum; audio and points are
 # excluded so their backbones (ImageBind, Uni3D) never load here.
@@ -35,6 +38,8 @@ class EBindModel(BaseModel):
     def __init__(self, checkpoint: str = DEFAULT_CHECKPOINT, device: str | None = None):
         super().__init__(device=device)
         self.checkpoint = checkpoint
+        # Only the default checkpoint's history is known here; any other loads from main.
+        self.revision = DEFAULT_REVISION if checkpoint == DEFAULT_CHECKPOINT else "main"
         self._transform = None
 
     def load(self) -> None:
@@ -44,7 +49,7 @@ class EBindModel(BaseModel):
         from ebind.models.perception_encoder.models import PEImageProcessor
 
         config = EBindConfig(modalities=list(_MODALITIES))
-        model = _EBind.from_pretrained(self.checkpoint, config=config)
+        model = _EBind.from_pretrained(self.checkpoint, config=config, revision=self.revision)
         self.model = model.eval().to(self.device)
         pe_name = PERCEPTION_ENCODER_CHECKPOINT_ARGS["repo_id"].split("/")[1]
         # PEImageProcessor.__call__ wants a file path; its .transform takes
