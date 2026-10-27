@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The EBind checkpoint `encord-team/ebind-full` loads at a pinned hub revision (`482831d`, `DEFAULT_REVISION`) instead of whatever `main` is. That snapshot has been `main` since 2025-11-19, so features are unchanged. viz2psy, word2psy and aud2psy pin the same revision, so the shared space cannot split when the hub moves. A non-default checkpoint still loads from `main`. The `ebind` extra pins the `ebind` package to `7909701`, and the DeepGaze dependency pins `7698f83`: the builds the family has been running on (psytwill's `setup_env.sh` already pinned DeepGaze to it).
+
 ## [0.13.0] - 2026-10-15
 
 Outputs change. Re-extract anything listed under **Changed outputs** before

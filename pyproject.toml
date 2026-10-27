@@ -49,7 +49,7 @@ dependencies = [
     # saliency in the default install (decided 2026-10-19). PyPI rejects
     # direct references, so this (and the `ebind` extra) must change before
     # the first PyPI release (see release.yml).
-    "deepgaze_pytorch @ git+https://github.com/matthias-k/DeepGaze",
+    "deepgaze_pytorch @ git+https://github.com/matthias-k/DeepGaze@7698f8344d84f9755dd913be58d554ea8936d926",
     "ultralytics>=8.0",
     "opencv-python>=4.8",
     # Interlaced video: OpenCV cannot decode it (blank frames, ok=True), so
@@ -71,7 +71,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest", "ipython", "commitizen>=3.12"]
-ebind = ["ebind @ git+https://github.com/encord-team/ebind"]
+ebind = ["ebind @ git+https://github.com/encord-team/ebind@7909701e9372353ca678b9515f9f61cf87c83c71"]
 interactive = ["kaleido>=0.2"]
 hypertools = ["hypertools>=0.8"]
 
