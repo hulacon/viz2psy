@@ -15,6 +15,16 @@ class ResMemModel(BaseModel):
 
     name = "resmem"
     checkpoint = "resmem-pretrained"
+    labels = {
+        "default": {
+            "interpretability": "nameable",
+            "derivation": "trained-on-labels",
+            "LongName": "Image memorability",
+            "Description": "Predicted image memorability (0-1) from ResMem, a network "
+                           "trained on human memorability scores",
+        },
+        "columns": {},
+    }
 
     def load(self) -> None:
         self.model = ResMem(pretrained=True)

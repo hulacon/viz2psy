@@ -2,8 +2,9 @@
 
 Uses a WideResNet-18 trained on Places365 to produce 365 scene category
 probabilities and 102 SUN scene attribute scores. The attribute scores
-are derived by multiplying the scene probabilities by a learned
-attribute weight matrix (W_sceneattribute).
+are a linear readout of the network's 512-d pooled features through a
+learned attribute weight matrix (W_sceneattribute, 102 x 512), not of the
+scene probabilities.
 """
 
 import io
@@ -16,6 +17,8 @@ import torch.nn.functional as F
 import torchvision.transforms as T
 from PIL import Image
 
+from viz2psy.exceptions import ModelLoadError
+
 from .base import BaseModel
 
 # URLs for model weights and label files hosted by MIT CSAIL.
@@ -23,6 +26,32 @@ _WEIGHTS_URL = "http://places2.csail.mit.edu/models_places365/wideresnet18_place
 _CATEGORIES_URL = "https://raw.githubusercontent.com/CSAILVision/places365/master/categories_places365.txt"
 _ATTRIBUTES_URL = "https://raw.githubusercontent.com/CSAILVision/places365/master/labels_sunattribute.txt"
 _W_ATTR_URL = "http://places2.csail.mit.edu/models_places365/W_sceneattribute_wideresnet18.npy"
+
+CHECKPOINT = "wideresnet18_places365"
+
+# The 102 SUN attribute column suffixes, in labels_sunattribute.txt order,
+# after the same lower/space/slash normalisation load() applies. Kept here so
+# the per-column labels can name exact columns without a download; load()
+# refuses a downloaded list that differs.
+SUN_ATTRIBUTES = (
+    "boating", "driving", "biking", "transporting", "sunbathing", "touring",
+    "hiking", "climbing", "camping", "reading", "studying", "training", "research",
+    "diving", "swimming", "bathing", "eating", "cleaning", "socializing",
+    "congregating", "waiting_in_line", "competing", "sports", "exercise", "playing",
+    "gaming", "spectating", "farming", "constructing", "shopping",
+    "medical_activity", "working", "using_tools", "digging", "conducting_business",
+    "praying", "fencing", "railing", "wire", "railroad", "trees", "grass",
+    "vegetation", "shrubbery", "foliage", "leaves", "flowers", "asphalt",
+    "pavement", "shingles", "carpet", "brick", "tiles", "concrete", "metal",
+    "paper", "wood", "vinyl", "plastic", "cloth", "sand", "rock", "dirt", "marble",
+    "glass", "surf", "ocean", "running_water", "still_water", "ice", "snow",
+    "clouds", "smoke", "fire", "natural_light", "sunny", "indoor_lighting", "aged",
+    "glossy", "matte", "sterile", "moist", "dry", "dirty", "rusty", "warm", "cold",
+    "natural", "man-made", "open_area", "semi-enclosed_area", "enclosed_area",
+    "far-away_horizon", "no_horizon", "rugged_scene", "vertical_components",
+    "horizontal_components", "symmetrical", "cluttered_space", "scary", "soothing",
+    "stressful",
+)
 
 # WideResNet-18 architecture (from the Places365 repo).
 # We define it inline to avoid cloning the full repo.
@@ -46,6 +75,11 @@ def _parse_categories(text: str) -> list[str]:
     """
     return ["_".join(line.split(" ")[0].strip("/").split("/")[1:])
             for line in text.strip().splitlines()]
+
+def _attribute_key(attr: str) -> str:
+    """Column suffix for one line of labels_sunattribute.txt."""
+    return attr.lower().replace(" ", "_").replace("/", "_")
+
 
 class _BasicBlock(nn.Module):
     expansion = 1
@@ -129,8 +163,29 @@ class PlacesModel(BaseModel):
     """
 
     name = "places"
-    checkpoint = "wideresnet18_places365"
+    checkpoint = CHECKPOINT
     extra_prefixes = ("sunattr",)
+    # Scene columns: Places365 classifier probabilities. SUN attributes: a
+    # learned linear readout (W_sceneattribute) of the same network's frozen
+    # pooled features, so a probe whose parent is this model's checkpoint.
+    labels = {
+        "default": {
+            "interpretability": "nameable",
+            "derivation": "trained-on-labels",
+            "Description": "Places365 probability (softmax over 365) of the scene category "
+                           "named in the column (WideResNet-18)",
+        },
+        "columns": {
+            f"sunattr_{a}": {
+                "derivation": "probe",
+                "derived_from": CHECKPOINT,
+                "Description": "SUN scene attribute score: a learned linear readout "
+                               "(W_sceneattribute) of the WideResNet-18 Places365 pooled "
+                               "features for the attribute named in the column",
+            }
+            for a in SUN_ATTRIBUTES
+        },
+    }
 
     def __init__(self, cache_dir: Path | None = None, device: str | None = None):
         super().__init__(device=device)
@@ -168,6 +223,13 @@ class PlacesModel(BaseModel):
         # Load SUN attribute labels.
         text = self._download_text(_ATTRIBUTES_URL)
         self._attributes = [line.strip() for line in text.strip().splitlines()]
+        keys = tuple(_attribute_key(a) for a in self._attributes)
+        if keys != SUN_ATTRIBUTES:
+            raise ModelLoadError(
+                self.name,
+                "the downloaded SUN attribute list differs from SUN_ATTRIBUTES, which "
+                "the per-column labels are keyed on; update both together",
+            )
 
         # Load attribute weight matrix (365 x 102).
         self._w_attr = self._download_npy(_W_ATTR_URL)
@@ -199,8 +261,7 @@ class PlacesModel(BaseModel):
                 row[f"places_{cat}"] = float(probs[i, j])
             # SUN attribute scores.
             for j, attr in enumerate(self._attributes):
-                key = attr.lower().replace(" ", "_").replace("/", "_")
-                row[f"sunattr_{key}"] = float(attr_scores[i, j])
+                row[f"sunattr_{_attribute_key(attr)}"] = float(attr_scores[i, j])
             results.append(row)
         return results
 

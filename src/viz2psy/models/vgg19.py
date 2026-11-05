@@ -27,6 +27,7 @@ import torch
 import torch.nn as nn
 import torchvision.transforms as T
 from PIL import Image
+from torchvision.models import VGG19_Weights
 
 from .base import BaseModel
 
@@ -62,6 +63,34 @@ def column_names() -> list[str]:
     return cols
 
 
+def _labels() -> dict:
+    """Contract B 1.2 labels: activations are an embedding; fc8 units are class logits.
+
+    fc8 is the ImageNet-1k classifier, so each unit is the (pre-softmax) logit
+    for one named class, trained end to end on ImageNet labels. Class names
+    come from the weights' own metadata (no download).
+    """
+    categories = VGG19_Weights.IMAGENET1K_V1.meta["categories"]
+    assert len(categories) == layer_width("fc8")
+    return {
+        "default": {
+            "interpretability": "opaque",
+            "derivation": "embedding",
+            "Description": "Spatial mean of one channel (one unit for fc6/fc7) of torchvision's "
+                           "ImageNet VGG19 at the layer named in the column (pre-ReLU at "
+                           "224 px; post-ReLU at 112 px for *_relu112_*)",
+        },
+        "columns": {
+            f"vgg19_fc8_{i:04d}": {
+                "interpretability": "nameable",
+                "derivation": "trained-on-labels",
+                "Description": f"VGG19 ImageNet-1k class logit (pre-softmax): {name}",
+            }
+            for i, name in enumerate(categories)
+        },
+    }
+
+
 class VGG19Model(BaseModel):
     """Layerwise VGG19 features (spatial mean per channel).
 
@@ -72,6 +101,7 @@ class VGG19Model(BaseModel):
     checkpoint = "torchvision/vgg19_IMAGENET1K_V1"
     # Every value is a finite activation mean; no column can be NaN.
     nulls: dict[str, dict[str, str]] = {}
+    labels = _labels()
 
     def __init__(self, device: str | None = None):
         super().__init__(device=device)

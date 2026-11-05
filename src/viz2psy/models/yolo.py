@@ -45,6 +45,32 @@ class YOLOModel(BaseModel):
 
     name = "yolo"
     checkpoint = _DEFAULT_MODEL
+    # yolo_mean_confidence describes the detector's run, not the image:
+    # bookkeeping, which consumers never sweep into a feature space. It is
+    # labelled opaque because it is not a perceptual, physical or
+    # psychological property of the stimulus.
+    labels = {
+        "default": {
+            "interpretability": "nameable",
+            "derivation": "trained-on-labels",
+            "Description": "Number of YOLOv8n detections (confidence >= 0.25, NMS IoU 0.45) "
+                           "of the COCO class named in the column",
+        },
+        "columns": {
+            "yolo_object_count": {"Description": "Total YOLOv8n detections, all COCO classes"},
+            "yolo_category_count": {"Description": "Number of distinct COCO classes detected"},
+            "yolo_object_coverage": {"Description": "Summed detection-box area as a fraction of "
+                                                    "the image, capped at 1"},
+            "yolo_largest_object_ratio": {"Description": "Largest detection-box area as a "
+                                                         "fraction of the image"},
+            "yolo_mean_confidence": {
+                "interpretability": "opaque",
+                "derivation": "bookkeeping",
+                "Description": "Mean detector confidence over this image's detections "
+                               "(0 when there are none)",
+            },
+        },
+    }
 
     def __init__(
         self,

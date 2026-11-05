@@ -7,8 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-11-05
+
+Feature values are unchanged; nothing needs re-extracting. Existing sidecars
+gain labels with `viz2psy sidecar refresh` (JSON only).
+
+### Added
+
+- **Contract B schema 1.2 (per-column `labels`):** every model entry in the
+  sidecar carries `labels`, saying what each feature column is and how its
+  value is computed: `{"default": {...}, "columns": {<column>: {...}}}`, where
+  a `columns` entry replaces the default's keys for that column (key-wise
+  merge). Each column resolves to `interpretability` (`nameable` / `opaque`)
+  and `derivation` (`formula`, `formula-on-model`, `trained-on-labels`,
+  `probe`, `zero-shot`, `embedding`, `bookkeeping`), plus `derived_from` (the
+  parent's exact checkpoint) for `probe` / `formula-on-model` / `zero-shot`,
+  and BIDS `LongName` / `Description` / `Units` where they are obvious.
+  Declared on the model class (`BaseModel.labels`), written by
+  `MetadataBuilder.add_model` with `columns` filtered to the emitted columns.
+  `schema_version` is now `"1.2"`. Vocabularies, the merge and the rule checks
+  live in `viz2psy.labels`. All 16 models are labelled:
+  - `clip`, `dinov2`, `ebind`: opaque embeddings. `vgg19`: opaque embedding,
+    except the 1,000 `fc8` units, which are ImageNet class logits
+    (nameable, trained-on-labels, class name in `Description`).
+  - `gist`, `llstat`, `motion`: nameable formulas (each `gist_NNN` column's
+    frequency, orientation and grid cell is in its `Description`).
+  - `saliency` and `emonet`: nameable probes. DeepGaze IIE trains only its
+    readout networks over four frozen ImageNet backbones; EmoNet retrains
+    only AlexNet's last fully connected layer. `derived_from` names the
+    backbones.
+  - `aesthetics`: nameable probe on CLIP `ViT-L-14/openai`.
+  - `places`: scene probabilities trained-on-labels; the 102 `sunattr_*`
+    columns are probes with `derived_from` = places' own checkpoint.
+  - `yolo`, `faces`, `depth`, `resmem`, `caption`: nameable,
+    trained-on-labels; `yolo_mean_confidence` is bookkeeping.
+- `tests/test_labels.py`: the producer-duty contract test (every inventory
+  column resolves to valid labels, `columns` keys are real columns,
+  `derived_from` present exactly where required; sidecar and refresh
+  round-trip).
+
 ### Changed
 
+- `viz2psy sidecar refresh` writes `labels` as well as `nulls` and brings
+  sidecars to 1.2. It still rewrites JSON only and never a CSV.
+- `places` hard-codes the 102 SUN attribute column names (`SUN_ATTRIBUTES`)
+  that its labels are keyed on, and `load()` refuses a downloaded attribute
+  list that differs. The module docstring now says what the code does: the
+  attribute scores are a linear readout of the 512-d pooled features, not of
+  the scene probabilities.
 - The EBind checkpoint `encord-team/ebind-full` loads at a pinned hub revision (`482831d`, `DEFAULT_REVISION`) instead of whatever `main` is. That snapshot has been `main` since 2025-11-19, so features are unchanged. viz2psy, word2psy and aud2psy pin the same revision, so the shared space cannot split when the hub moves. A non-default checkpoint still loads from `main`. The `ebind` extra pins the `ebind` package to `7909701`, and the DeepGaze dependency pins `7698f83`: the builds the family has been running on (psytwill's `setup_env.sh` already pinned DeepGaze to it).
 
 ## [0.13.0] - 2026-10-15

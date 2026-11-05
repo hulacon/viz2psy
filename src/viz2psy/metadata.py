@@ -85,7 +85,7 @@ def default_preprocessing(model_name: str) -> dict | None:
     return describe() if describe else None
 
 
-SCHEMA_VERSION = "1.1"  # Contract B §4.1 extractor output convention
+SCHEMA_VERSION = "1.2"  # Contract B §4.1 extractor output convention
 
 
 def declared_nulls(model_name: str) -> dict[str, dict[str, str]]:
@@ -97,6 +97,18 @@ def declared_nulls(model_name: str) -> dict[str, dict[str, str]]:
     from viz2psy.cli import _load_model_class
 
     return {col: dict(entry) for col, entry in _load_model_class(model_name).nulls.items()}
+
+
+def declared_labels(model_name: str, columns: list[str]) -> dict:
+    """The model's Contract B 1.2 ``labels`` for the emitted ``columns``.
+
+    Read from the model class like :func:`declared_nulls`, and like it never
+    swallows an error: a sidecar without labels must be a visible failure.
+    """
+    from viz2psy.cli import _load_model_class
+    from viz2psy.labels import for_columns
+
+    return for_columns(_load_model_class(model_name).labels, columns)
 
 
 def get_feature_info(model_name: str, feature_names: list[str]) -> dict[str, Any]:
@@ -300,6 +312,7 @@ class MetadataBuilder:
             entry["preprocessing"] = preprocessing
         emitted = set(feature_names)
         entry["nulls"] = {c: e for c, e in declared_nulls(model_name).items() if c in emitted}
+        entry["labels"] = declared_labels(model_name, feature_names)
         self.models[model_name] = entry
         self.model_features[model_name] = feature_names
         self.total_runtime_sec += runtime_sec

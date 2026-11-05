@@ -63,6 +63,22 @@ class FacesModel(BaseModel):
         "faces_mutual_dist": {"means": "undefined", "when": "fewer than two faces detected (score >= 0.9)"},
     }
     checkpoint = "opencv_zoo/face_detection_yunet_2023mar"
+    labels = {
+        "default": {
+            "interpretability": "nameable",
+            "derivation": "trained-on-labels",
+        },
+        "columns": {
+            "faces_count": {"Description": "Number of faces detected by YuNet at score >= 0.9"},
+            "faces_total_area": {"Description": "Summed face-box area as a fraction of the image "
+                                                "(overlaps counted twice)"},
+            "faces_max_area": {"Description": "Largest face-box area as a fraction of the image"},
+            "faces_center_dist": {"Description": "Mean distance of face centres from the image "
+                                                 "centre, over the half-diagonal"},
+            "faces_mutual_dist": {"Description": "Mean pairwise distance between face centres, "
+                                                 "over the half-diagonal"},
+        },
+    }
 
     def __init__(self, weights_path: Path | None = None, device: str | None = None):
         super().__init__(device=device)  # detector is CPU; kept for interface parity

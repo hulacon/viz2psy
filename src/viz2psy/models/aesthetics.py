@@ -54,6 +54,21 @@ class AestheticsModel(BaseModel):
 
     name = "aesthetics"
     checkpoint = f"{_CLIP_MODEL}/{_CLIP_PRETRAINED}+sac+logos+ava1-l14-linearMSE"
+    # A probe: the MLP head is trained on human aesthetic ratings over a frozen
+    # CLIP ViT-L-14 (OpenAI weights) image embedding. derived_from names that
+    # backbone in the same {model}/{pretrained} form clip's checkpoint uses.
+    labels = {
+        "default": {
+            "interpretability": "nameable",
+            "derivation": "probe",
+            "derived_from": f"{_CLIP_MODEL}/{_CLIP_PRETRAINED}",
+            "LongName": "Aesthetic quality",
+            "Description": "Predicted aesthetic rating (approximately 1-10) from the LAION "
+                           "aesthetic predictor: an MLP trained on human ratings (SAC, "
+                           "LAION-Logos, AVA) over frozen CLIP ViT-L-14 embeddings",
+        },
+        "columns": {},
+    }
 
     def __init__(self, device: str | None = None):
         super().__init__(device=device)

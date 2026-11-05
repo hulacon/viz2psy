@@ -69,12 +69,12 @@ def test_motion_static_pair_and_video_end_are_declared(motion_model, tmp_path): 
     assert {declared[c]["means"] for c in MOTION_COLS if c != "motion_coherence"} == {"undefinable"}
 
 
-def test_sidecar_is_1_1_with_every_model_carrying_nulls(tmp_path):
+def test_sidecar_carries_nulls_on_every_model(tmp_path):
     b = MetadataBuilder()
     b.add_model("faces", FACE_COLS, 1.0)
     b.add_model("llstat", ["llstat_luminance_mean"], 1.0)
     meta = b.build()
-    assert meta["schema_version"] == SCHEMA_VERSION == "1.1"
+    assert meta["schema_version"] == SCHEMA_VERSION
     assert set(meta["models"]["faces"]["nulls"]) == {"faces_center_dist", "faces_mutual_dist"}
     assert meta["models"]["llstat"]["nulls"] == {}
 
@@ -93,6 +93,7 @@ class TestRefresh:
         meta["schema_version"] = "1.0"
         for e in meta["models"].values():
             e.pop("nulls")
+            e.pop("labels")
         side = tmp_path / "scores.meta.json"
         side.write_text(json.dumps(meta, indent=2))
         return csv, side
@@ -102,7 +103,7 @@ class TestRefresh:
         before = csv.read_bytes()
         assert refresh_sidecar(side).status == "refreshed"
         meta = json.loads(side.read_text())
-        assert meta["schema_version"] == "1.1"
+        assert meta["schema_version"] == SCHEMA_VERSION
         assert set(meta["models"]["faces"]["nulls"]) == {"faces_center_dist"}
         assert meta["models"]["llstat"]["nulls"] == {}
         assert csv.read_bytes() == before
