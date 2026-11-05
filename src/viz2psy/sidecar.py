@@ -1,9 +1,11 @@
-"""`viz2psy sidecar refresh`: bring existing sidecars up to schema 1.1.
+"""`viz2psy sidecar refresh`: bring existing sidecars up to the current schema (1.2).
 
 Contract B 1.1 adds a `nulls` map to every model entry (what a NaN in each
-column means). Feature values do not change between 1.0 and 1.1, so an old
+column means); 1.2 adds per-column `labels` (what each column is and how its
+value is computed). Feature values do not change from 1.0 to 1.2, so an old
 scores file is brought forward by rewriting its `.meta.json` only; the CSV is
-never written.
+never written. Both maps are re-read from the installed model classes, so a
+refresh also carries a label or null declaration changed in a patch release.
 
 A refreshed sidecar is checked against the table it describes: each model's
 columns are read back from the recorded `output` CSV, and a column holding
@@ -21,7 +23,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from viz2psy.exceptions import Viz2PsyError
-from viz2psy.metadata import SCHEMA_VERSION, declared_nulls
+from viz2psy.metadata import SCHEMA_VERSION, declared_labels, declared_nulls
 
 
 @dataclass
@@ -87,6 +89,7 @@ def refresh_sidecar(path: str | Path, *, dry_run: bool = False) -> RefreshResult
     for name, entry in new["models"].items():
         cols = _model_columns(name, entry, list(table.columns))
         entry["nulls"] = {c: e for c, e in declared_nulls(name).items() if c in cols}
+        entry["labels"] = declared_labels(name, sorted(cols))
         bad = sorted((cols & nan_cols) - set(entry["nulls"]))
         if bad:
             undeclared[name] = bad
@@ -101,7 +104,7 @@ def refresh_sidecar(path: str | Path, *, dry_run: bool = False) -> RefreshResult
     new.setdefault("refreshed", []).append({
         "by": f"viz2psy {__version__}",
         "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "fields": ["schema_version", "models.*.nulls"],
+        "fields": ["schema_version", "models.*.nulls", "models.*.labels"],
         "from_schema_version": meta.get("schema_version"),
     })
     if not dry_run:
@@ -122,7 +125,8 @@ def main(argv: list[str]) -> int:
     sub = parser.add_subparsers(dest="sidecar_cmd")
     p_rf = sub.add_parser(
         "refresh",
-        help="Bring sidecars to the current Contract B schema (1.1: per-model `nulls`). "
+        help="Bring sidecars to the current Contract B schema (1.2: per-model `nulls` and "
+             "per-column `labels`). "
              "Rewrites JSON only, never a CSV; refuses a sidecar whose table holds NaN in "
              "an undeclared column.",
     )

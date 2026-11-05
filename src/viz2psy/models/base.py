@@ -34,6 +34,13 @@ class BaseModel(ABC):
     # ``undefinable`` / ``missing``) and when. ``{}`` is a positive claim that
     # no column can be null. Stamped into the sidecar by metadata.add_model.
     nulls: dict[str, dict[str, str]] = {}
+    # Contract B §4.1 (schema 1.2): what each column is and how its value is
+    # computed, in the sidecar's own shape: {"default": {...}, "columns":
+    # {<exact column>: {...}}}, merged key-wise per column (viz2psy.labels).
+    # Every column must resolve to `interpretability` + `derivation`; the
+    # empty default here resolves nothing, so an undeclared model fails
+    # tests/test_labels.py. Stamped into the sidecar by metadata.add_model.
+    labels: dict[str, dict] = {}
 
     def __init__(self, device: str | None = None):
         if device:

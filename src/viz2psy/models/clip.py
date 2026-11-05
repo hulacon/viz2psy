@@ -18,6 +18,15 @@ class CLIPModel(BaseModel):
 
     name = "clip"
     checkpoint = f"{_DEFAULT_MODEL_NAME}/{_DEFAULT_PRETRAINED}"
+    labels = {
+        "default": {
+            "interpretability": "opaque",
+            "derivation": "embedding",
+            "Description": "One dimension of the L2-normalised OpenCLIP ViT-B-32 "
+                           "(laion2b_s34b_b79k) image embedding",
+        },
+        "columns": {},
+    }
 
     def __init__(
         self,

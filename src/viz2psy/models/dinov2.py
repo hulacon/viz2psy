@@ -29,6 +29,15 @@ class DINOv2Model(BaseModel):
 
     name = "dinov2"
     checkpoint = _DEFAULT_MODEL_NAME
+    labels = {
+        "default": {
+            "interpretability": "opaque",
+            "derivation": "embedding",
+            "Description": "One dimension of the DINOv2 ViT-B/14 (dinov2_vitb14) CLS-token "
+                           "image embedding",
+        },
+        "columns": {},
+    }
 
     def __init__(self, model_name: str = _DEFAULT_MODEL_NAME, device: str | None = None):
         super().__init__(device=device)

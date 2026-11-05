@@ -63,6 +63,32 @@ def _compute_gist(
     return np.array(descriptor, dtype=np.float64)
 
 
+def _column_descriptions(
+    n_orientations: int = _DEFAULT_N_ORIENTATIONS,
+    frequencies: tuple[float, ...] = _DEFAULT_FREQUENCIES,
+    grid_size: int = _DEFAULT_GRID_SIZE,
+) -> dict[str, str]:
+    """What each ``gist_NNN`` column measures, in emission order.
+
+    Mirrors :func:`_build_gabor_bank` (frequency-major, then orientation) and
+    :func:`_compute_gist` (grid row-major within each filter).
+    """
+    out = {}
+    i = 0
+    for freq in frequencies:
+        for o in range(n_orientations):
+            theta = o * 180.0 / n_orientations
+            for row in range(grid_size):
+                for col in range(grid_size):
+                    out[f"gist_{i:03d}"] = (
+                        f"Mean Gabor magnitude, frequency {freq:g} cycles/pixel (256 px "
+                        f"image), orientation theta {theta:g} deg, grid cell row {row} "
+                        f"col {col} of {grid_size} x {grid_size}"
+                    )
+                    i += 1
+    return out
+
+
 class GISTModel(BaseModel):
     """Spatial envelope descriptor (Oliva & Torralba 2001).
 
@@ -71,6 +97,15 @@ class GISTModel(BaseModel):
     """
 
     name = "gist"
+    labels = {
+        "default": {
+            "interpretability": "nameable",
+            "derivation": "formula",
+            "Description": "GIST spatial-envelope descriptor (Oliva & Torralba 2001): mean "
+                           "Gabor magnitude at one scale and orientation in one grid cell",
+        },
+        "columns": {c: {"Description": d} for c, d in _column_descriptions().items()},
+    }
 
     def __init__(
         self,

@@ -75,6 +75,27 @@ class MotionModel(BaseModel):
                                      "has no direction (also NaN on the end-of-video row)"},
     }
     checkpoint = None  # analytic (Farnebäck dense flow), no learned weights
+    labels = {
+        "default": {"interpretability": "nameable", "derivation": "formula"},
+        "columns": {
+            "motion_energy": {"Description": "Mean Farnebäck optical-flow magnitude between "
+                                             "the frame and the next native frame",
+                              "Units": "frame heights per second"},
+            "motion_energy_p95": {"Description": "95th-percentile optical-flow magnitude",
+                                  "Units": "frame heights per second"},
+            "motion_coherence": {"Description": "|mean flow vector| / mean flow magnitude, 0-1 "
+                                                "(1 = global translation such as a pan)"},
+            "motion_horizontal": {"Description": "Mean horizontal flow component (+ = rightward)",
+                                  "Units": "frame heights per second"},
+            "motion_vertical": {"Description": "Mean vertical flow component (+ = downward)",
+                                "Units": "frame heights per second"},
+            "motion_radial": {"Description": "Mean flow projected away from the frame centre "
+                                             "(+ = expansion, - = contraction)",
+                              "Units": "frame heights per second"},
+            "motion_frame_diff": {"Description": "Mean absolute grayscale difference from the "
+                                                 "next native frame, 0-1"},
+        },
+    }
     video_only = True
 
     def load(self) -> None:

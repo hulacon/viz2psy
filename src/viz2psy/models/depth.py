@@ -54,6 +54,29 @@ class DepthModel(BaseModel):
 
     name = "depth"
     checkpoint = CHECKPOINT
+    labels = {
+        "default": {
+            "interpretability": "nameable",
+            "derivation": "trained-on-labels",
+            "Description": "Scene-layout statistic of the per-image normalised relative depth "
+                           "map from Depth Anything V2 Small (1 = nearest)",
+        },
+        "columns": {
+            "depth_fg_fraction": {"Description": f"Fraction of pixels in the near field "
+                                                 f"(normalised depth > {NEAR_THRESHOLD})"},
+            "depth_openness": {"Description": f"Fraction of pixels in the far field "
+                                              f"(normalised depth < {FAR_THRESHOLD})"},
+            "depth_iqr": {"Description": "Interquartile range of normalised depth "
+                                         "(foreground/background separation)"},
+            "depth_skew": {"Description": "Skewness of normalised depth (negative = "
+                                          "near-dominated, positive = far-dominated)"},
+            "depth_edge_density": {"Description": "Mean gradient magnitude of the normalised "
+                                                  "depth map (depth discontinuities)"},
+            "depth_center_near": {"Description": "Mean normalised depth in the centre third "
+                                                 "minus the periphery (positive = near content "
+                                                 "centred)"},
+        },
+    }
 
     def load(self) -> None:
         from transformers import AutoImageProcessor, AutoModelForDepthEstimation

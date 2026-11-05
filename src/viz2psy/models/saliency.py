@@ -58,6 +58,27 @@ class SaliencyModel(BaseModel):
 
     name = "saliency"
     checkpoint = "DeepGazeIIE-pretrained"
+    # A probe. deepgaze_pytorch's DeepGazeIIE averages readouts over four
+    # ImageNet backbones whose parameters are frozen (DeepGazeIIIMixture sets
+    # requires_grad=False on `features` and keeps them in eval mode); only the
+    # small 1x1-conv readout and fixation-selection networks, the blur and the
+    # centre-bias weight were trained on fixations. derived_from lists the
+    # four backbones in BACKBONES order, by the weight names the package loads.
+    labels = {
+        "default": {
+            "interpretability": "nameable",
+            "derivation": "probe",
+            "derived_from": "resnet50_trained_on_SIN_and_IN_then_finetuned_on_IN"
+                            "+efficientnet-b5+densenet201+resnext50_32x4d",
+            "LongName": "Predicted fixation density",
+            "Description": "DeepGaze IIE predicted fixation probability in one cell of a "
+                           "24 x 24 grid over the whole frame (saliency_{x}_{y}: x = column, "
+                           "y = row, from top left); the 576 cells sum to 1 per image. Readout "
+                           "networks trained on human fixations over four frozen ImageNet "
+                           "backbones",
+        },
+        "columns": {},
+    }
 
     def __init__(self, grid_size: int = _DEFAULT_GRID_SIZE, device: str | None = None,
                  canonical_area: int | None = CANONICAL_AREA, pixel_aspect: float = 1.0):

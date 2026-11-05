@@ -34,6 +34,16 @@ class EBindModel(BaseModel):
 
     name = "ebind"
     checkpoint = DEFAULT_CHECKPOINT
+    labels = {
+        "default": {
+            "interpretability": "opaque",
+            "derivation": "embedding",
+            "Description": "One dimension of the L2-normalised EBind image embedding "
+                           "(Perception Encoder vision arm), in the space shared with "
+                           "ebind_text and ebind_audio",
+        },
+        "columns": {},
+    }
 
     def __init__(self, checkpoint: str = DEFAULT_CHECKPOINT, device: str | None = None):
         super().__init__(device=device)

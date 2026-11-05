@@ -121,6 +121,23 @@ class EmoNetModel(BaseModel):
 
     name = "emonet"
     checkpoint = "emonet-pytorch/osf-amdju"
+    # A probe. Kragel et al. (2019, Methods) fixed every layer of a pretrained
+    # AlexNet except the last fully connected layer, which they retrained on
+    # the 20 emotion categories; the ecco-laboratory/emonet-pytorch README
+    # says the AlexNet was MATLAB's pretrained one, which MATLAB loads as
+    # alexnet('Weights','imagenet'). derived_from is that load call.
+    labels = {
+        "default": {
+            "interpretability": "nameable",
+            "derivation": "probe",
+            "derived_from": "MATLAB alexnet('Weights','imagenet')",
+            "Description": "Predicted probability (softmax over 20) of one Cowen & Keltner "
+                           "(2017) emotion category for the whole image, from EmoNet: "
+                           "AlexNet with its last fully connected layer retrained on video "
+                           "frames labelled with the 20 categories, all other layers fixed",
+        },
+        "columns": {col: {"LongName": cat} for col, cat in zip(EMONET_COLUMNS, EMOTION_CATEGORIES)},
+    }
 
     def __init__(self, weights_path: Path | str | None = None, device: str | None = None):
         super().__init__(device=device)

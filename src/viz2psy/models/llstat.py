@@ -70,6 +70,32 @@ class LLStatModel(BaseModel):
         "llstat_lf_energy": {"means": "undefined", "when": "an all-black image (zero spectral power)"},
     }
 
+    labels = {
+        "default": {"interpretability": "nameable", "derivation": "formula"},
+        "columns": {
+            "llstat_luminance_mean": {"Description": "Mean relative luminance (ITU-R BT.601), 0-1"},
+            "llstat_luminance_std": {"Description": "Standard deviation of relative luminance"},
+            "llstat_rms_contrast": {"Description": "RMS contrast: luminance SD / mean luminance"},
+            "llstat_r_mean": {"Description": "Mean red channel value, 0-1"},
+            "llstat_r_std": {"Description": "Standard deviation of the red channel"},
+            "llstat_g_mean": {"Description": "Mean green channel value, 0-1"},
+            "llstat_g_std": {"Description": "Standard deviation of the green channel"},
+            "llstat_b_mean": {"Description": "Mean blue channel value, 0-1"},
+            "llstat_b_std": {"Description": "Standard deviation of the blue channel"},
+            "llstat_lab_l_mean": {"Description": "Mean CIE L* (lightness)"},
+            "llstat_lab_a_mean": {"Description": "Mean CIE a* (green-red axis)"},
+            "llstat_lab_b_mean": {"Description": "Mean CIE b* (blue-yellow axis)"},
+            "llstat_saturation_mean": {"Description": "Mean HSV saturation, 0-1"},
+            "llstat_hf_energy": {"Description": "Fraction of luminance spectral power above "
+                                                "the median radial frequency"},
+            "llstat_lf_energy": {"Description": "Fraction of luminance spectral power at or "
+                                                "below the median radial frequency"},
+            "llstat_edge_density": {"Description": "Fraction of pixels marked as edges by a "
+                                                   "Canny detector (sigma 1) on luminance"},
+            "llstat_colorfulness": {"Description": "Colourfulness (Hasler & Suesstrunk 2003)"},
+        },
+    }
+
     def load(self) -> None:
         """No model to load — all features are computed analytically."""
         self.model = None
