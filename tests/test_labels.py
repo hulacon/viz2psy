@@ -230,7 +230,7 @@ def test_sidecar_writes_labels_for_emitted_columns_only():
     b.add_model("faces", ["faces_count", "faces_center_dist"], 1.0)
     b.add_model("caption", ["caption_text"], 1.0)
     meta = b.build()
-    assert meta["schema_version"] == SCHEMA_VERSION == "1.2"
+    assert meta["schema_version"] == SCHEMA_VERSION == "1.3"
     faces = meta["models"]["faces"]["labels"]
     assert set(faces) == {"default", "columns"}
     assert set(faces["columns"]) == {"faces_count", "faces_center_dist"}
@@ -257,7 +257,7 @@ def test_refresh_adds_labels_and_never_touches_the_csv(tmp_path):
 
     assert refresh_sidecar(side).status == "refreshed"
     new = json.loads(side.read_text())
-    assert new["schema_version"] == "1.2"
+    assert new["schema_version"] == "1.3"  # not a video sidecar: no framing needed
     assert set(new["models"]["faces"]["labels"]["columns"]) == {"faces_count"}
     assert set(new["models"]["llstat"]["labels"]["columns"]) == {"llstat_luminance_mean"}
     assert "models.*.labels" in new["refreshed"][-1]["fields"]

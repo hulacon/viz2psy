@@ -1,4 +1,4 @@
-"""`viz2psy sidecar refresh`: bring existing sidecars up to the current schema (1.2).
+"""`viz2psy sidecar refresh`: bring existing sidecars up to the current schema (1.3).
 
 Contract B 1.1 adds a `nulls` map to every model entry (what a NaN in each
 column means); 1.2 adds per-column `labels` (what each column is and how its
@@ -11,6 +11,12 @@ A refreshed sidecar is checked against the table it describes: each model's
 columns are read back from the recorded `output` CSV, and a column holding
 NaN without a declaration refuses the refresh for that sidecar (nothing is
 written), so a producer defect surfaces here rather than in a downstream fit.
+
+1.3 adds `input.framing` to video sidecars: what the models scored. That is a
+fact about the extraction run, which a refresh cannot recover (before 0.15.0
+a run scored JPEG q85 copies on `--save-frames`, `--parallel` or memory
+pressure, unrecorded). So a video sidecar without it is refreshed to 1.2 at
+most; image and HDF5 sidecars go to 1.3.
 """
 
 from __future__ import annotations
@@ -72,6 +78,25 @@ def _model_columns(name: str, entry: dict, table_columns: list[str]) -> set[str]
     return {c for c in table_columns if any(c.startswith(p) for p in prefixes)}
 
 
+def _version_tuple(v) -> tuple[int, ...]:
+    try:
+        return tuple(int(x) for x in str(v).split("."))
+    except ValueError:
+        return (0,)
+
+
+def _target_version(meta: dict) -> str:
+    """The schema a refresh may claim: 1.3 needs `input.framing` on video."""
+    inp = meta.get("input") or {}
+    target = SCHEMA_VERSION
+    if inp.get("type") == "video" and "framing" not in inp:
+        target = "1.2"
+    current = meta.get("schema_version")
+    if current is not None and _version_tuple(current) > _version_tuple(target):
+        return str(current)  # never lower a version
+    return target
+
+
 def refresh_sidecar(path: str | Path, *, dry_run: bool = False) -> RefreshResult:
     import pandas as pd
 
@@ -96,7 +121,7 @@ def refresh_sidecar(path: str | Path, *, dry_run: bool = False) -> RefreshResult
     if undeclared:
         return RefreshResult(path, "refused", undeclared,
                              note="NaN in undeclared column(s): a producer defect; nothing written")
-    new["schema_version"] = SCHEMA_VERSION
+    new["schema_version"] = _target_version(new)
     if new == meta:
         return RefreshResult(path, "unchanged")
     from viz2psy import __version__

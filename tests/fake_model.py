@@ -24,3 +24,14 @@ class OtherFakeModel(FakeModel):
 
     def predict(self, image):
         return {"otherfake_max": float(np.asarray(image, dtype=float).max())}
+
+
+class TextureFakeModel(FakeModel):
+    """Mean absolute horizontal gradient: JPEG's block smoothing moves it, so
+    a lossy round trip anywhere on the scoring path shows up in this column."""
+
+    name = "texture"
+
+    def predict(self, image):
+        a = np.asarray(image, dtype=float)
+        return {"texture_grad": float(np.abs(np.diff(a, axis=1)).mean())}

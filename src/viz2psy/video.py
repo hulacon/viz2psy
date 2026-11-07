@@ -194,12 +194,24 @@ def get_available_memory() -> int:
     return psutil.virtual_memory().available
 
 
+def _save_frame(image: Image.Image, directory: Path, t: float, fmt: str) -> Path:
+    """Write one frame as ``frame_<t>.<fmt>``: JPEG at quality 85 (lossy), or
+    PNG at compress level 1 (lossless; fast to write, larger on disk)."""
+    if fmt not in ("jpg", "png"):
+        raise ValueError(f"frame format must be 'jpg' or 'png', not {fmt!r}")
+    path = directory / f"frame_{t:.3f}.{fmt}"
+    image.save(path, **({"quality": 85} if fmt == "jpg" else {"compress_level": 1}))
+    return path
+
+
 def extract_frames(
     video_path: Path,
     frame_interval: float = 0.5,
     save_dir: Path | None = None,
     quiet: bool = False,
     frame_format: str = "jpg",
+    view_dir: Path | None = None,
+    view_format: str = "jpg",
 ) -> list[tuple[float, Image.Image | Path]]:
     """Extract frames from a video at specified time intervals.
 
@@ -216,6 +228,14 @@ def extract_frames(
         Suppress progress output.
     frame_format : str
         Image format for saved frames: ``"jpg"`` (default) or ``"png"``.
+        JPEG is lossy (quality 85): do not score a model on the returned
+        paths unless this is ``"png"``.
+    view_dir : Path, optional
+        Also write a viewing copy of each frame here, in ``view_format``.
+        Viewing copies are never returned, so what the caller scores is
+        unaffected by their format.
+    view_format : str
+        ``"jpg"`` (default) or ``"png"``, for ``view_dir``.
 
     Returns
     -------
@@ -251,6 +271,9 @@ def extract_frames(
         if save_dir:
             save_dir = Path(save_dir)
             save_dir.mkdir(parents=True, exist_ok=True)
+        if view_dir:
+            view_dir = Path(view_dir)
+            view_dir.mkdir(parents=True, exist_ok=True)
 
         frames = []
         timestamps = sample_times(duration, frame_interval)
@@ -287,12 +310,10 @@ def extract_frames(
             previous = frame_rgb
             pil_image = Image.fromarray(frame_rgb)
 
+            if view_dir:
+                _save_frame(pil_image, view_dir, t, view_format)
             if save_dir:
-                ext = "jpg" if frame_format == "jpg" else "png"
-                frame_path = save_dir / f"frame_{t:.3f}.{ext}"
-                save_kwargs = {"quality": 85} if ext == "jpg" else {}
-                pil_image.save(frame_path, **save_kwargs)
-                frames.append((t, frame_path))
+                frames.append((t, _save_frame(pil_image, save_dir, t, frame_format)))
             else:
                 frames.append((t, pil_image))
 
@@ -321,12 +342,14 @@ def extract_frames_to_temp(
     video_path: Path,
     frame_interval: float = 0.5,
     quiet: bool = False,
-    frame_format: str = "jpg",
+    view_dir: Path | None = None,
+    view_format: str = "jpg",
 ) -> tuple[list[tuple[float, Path]], tempfile.TemporaryDirectory]:
-    """Extract frames to a temporary directory.
+    """Extract frames to a temporary directory as lossless PNG, for scoring.
 
     Returns the frames list and the TemporaryDirectory object (caller must
-    keep a reference to prevent cleanup).
+    keep a reference to prevent cleanup). Before 0.15.0 this took a
+    ``frame_format`` and defaulted to JPEG q85, so models scored a lossy copy.
 
     Parameters
     ----------
@@ -336,8 +359,8 @@ def extract_frames_to_temp(
         Time between frames in seconds.
     quiet : bool
         Suppress progress output.
-    frame_format : str
-        Image format for saved frames: ``"jpg"`` (default) or ``"png"``.
+    view_dir, view_format
+        Optional viewing copies, as in ``extract_frames``.
 
     Returns
     -------
@@ -351,6 +374,8 @@ def extract_frames_to_temp(
         frame_interval=frame_interval,
         save_dir=Path(temp_dir.name),
         quiet=quiet,
-        frame_format=frame_format,
+        frame_format="png",
+        view_dir=view_dir,
+        view_format=view_format,
     )
     return frames, temp_dir

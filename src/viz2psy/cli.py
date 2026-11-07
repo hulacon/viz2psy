@@ -569,57 +569,42 @@ def _process_video(
         print(f"  Frames to extract: {n_frames} (every {frame_interval}s)")
         print(f"  Estimated memory: {_format_bytes(estimated_mem)}")
 
-    # Set metadata input info
+    # Models always score the decoded frames. Saved frames (--save-frames) are
+    # viewing copies in the requested format and are never read back for
+    # scoring, because JPEG q85 moves some models' features to r ~ .95. When
+    # frames must go to disk (parallel workers, or memory pressure), the
+    # scoring copies are lossless PNG.
+    parallel_run = parallel and len(models) > 1
+    memory_tight = estimated_mem > available_mem * 0.8
+    to_disk = parallel_run or memory_tight
+    if save_frames and not quiet:
+        print(f"  Saving {frame_format} frames for viewing to: {save_frames}")
+    if memory_tight and not quiet:
+        print(f"  Warning: Estimated memory ({_format_bytes(estimated_mem)}) "
+              f"exceeds 80% of available ({_format_bytes(available_mem)})")
+    if to_disk and not quiet:
+        print("  Scoring from lossless PNG frames on disk"
+              + (" (parallel workers)" if parallel_run else ""))
+
     if metadata:
         metadata.set_input_video(video_path, frame_interval, n_frames, save_frames,
-                                frame_format=frame_format)
+                                 frame_format=frame_format,
+                                 frame_cache="png" if to_disk else "memory")
 
-    # For parallel mode, we need frames on disk
-    use_temp_dir = False
     temp_dir = None
-    if save_frames:
-        # User explicitly requested saving frames
-        if not quiet:
-            print(f"  Saving frames to: {save_frames}")
-        frames = extract_frames(
-            video_path,
-            frame_interval=frame_interval,
-            save_dir=save_frames,
-            quiet=quiet,
-            frame_format=frame_format,
-        )
-    elif parallel and len(models) > 1:
-        # Parallel mode requires frames on disk
-        if not quiet:
-            print("  Saving frames to temp directory for parallel processing...")
+    if to_disk and save_frames and frame_format == "png":
+        # The viewing copies are already lossless: score from them.
+        frames = extract_frames(video_path, frame_interval=frame_interval,
+                                save_dir=save_frames, quiet=quiet, frame_format="png")
+    elif to_disk:
         frames, temp_dir = extract_frames_to_temp(
-            video_path,
-            frame_interval=frame_interval,
-            quiet=quiet,
-            frame_format=frame_format,
+            video_path, frame_interval=frame_interval, quiet=quiet,
+            view_dir=save_frames, view_format=frame_format,
         )
-        use_temp_dir = True
-    elif estimated_mem > available_mem * 0.8:
-        # Memory might be tight, use temp directory
-        if not quiet:
-            print(f"  Warning: Estimated memory ({_format_bytes(estimated_mem)}) "
-                  f"exceeds 80% of available ({_format_bytes(available_mem)})")
-            print("  Using temporary directory for frames...")
-        frames, temp_dir = extract_frames_to_temp(
-            video_path,
-            frame_interval=frame_interval,
-            quiet=quiet,
-            frame_format=frame_format,
-        )
-        use_temp_dir = True
     else:
-        # Load frames into memory
-        frames = extract_frames(
-            video_path,
-            frame_interval=frame_interval,
-            save_dir=None,
-            quiet=quiet,
-        )
+        frames = extract_frames(video_path, frame_interval=frame_interval,
+                                quiet=quiet, view_dir=save_frames,
+                                view_format=frame_format)
 
     try:
         # Extract times and images/paths
@@ -661,7 +646,7 @@ def _process_video(
             return result_df
 
         # Parallel execution with frames on disk
-        if parallel and len(models) > 1 and (save_frames or use_temp_dir):
+        if parallel_run:
             from concurrent.futures import ProcessPoolExecutor, as_completed
             import pandas as pd
 
@@ -715,8 +700,8 @@ def _process_video(
             return _merge_video_results(result_df)
 
         # Sequential execution (original behavior)
-        # If we have paths, load them as PIL images for scoring
-        if save_frames or use_temp_dir:
+        # If we have paths (lossless PNG), load them as PIL images for scoring
+        if to_disk:
             from viz2psy.utils import load_image
             images = [load_image(p) for p in images_or_paths]
         else:
@@ -1035,7 +1020,8 @@ def main():
         "--save-frames",
         type=Path,
         default=None,
-        help="Save extracted video frames to this directory. Default: auto (derives from output path).",
+        help="Save viewing copies of the video frames to this directory. Default: auto "
+             "(derives from output path). Models never score these copies.",
     )
     parser.add_argument(
         "--no-save-frames",
@@ -1046,7 +1032,8 @@ def main():
         "--frame-format",
         choices=["jpg", "png"],
         default="jpg",
-        help="Image format for saved video frames (default: jpg). JPEG is ~7x smaller than PNG.",
+        help="Image format for saved video frames (default: jpg). JPEG is ~7x smaller than PNG. "
+             "Viewing copies only: models always score the decoded frames.",
     )
     # HDF5-specific options
     parser.add_argument(
