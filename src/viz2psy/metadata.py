@@ -85,7 +85,7 @@ def default_preprocessing(model_name: str) -> dict | None:
     return describe() if describe else None
 
 
-SCHEMA_VERSION = "1.2"  # Contract B §4.1 extractor output convention
+SCHEMA_VERSION = "1.3"  # Contract B §4.1 extractor output convention
 
 
 def declared_nulls(model_name: str) -> dict[str, dict[str, str]]:
@@ -262,13 +262,21 @@ class MetadataBuilder:
         n_frames: int,
         saved_frames_dir: Path | None = None,
         frame_format: str = "jpg",
+        frame_cache: str = "memory",
     ):
-        """Set input info for video file."""
+        """Set input info for video file.
+
+        ``framing`` (schema 1.3) records what the models scored: always the
+        decoded frames (``frame_source``), held in memory or cached on disk
+        as lossless PNG (``frame_cache``). ``saved_frames_*`` describe viewing
+        copies only; models never read them.
+        """
         self.input_info = {
             "type": "video",
             "path": str(path.resolve()),
             "frame_interval_sec": frame_interval,
-            "n_frames": n_frames
+            "n_frames": n_frames,
+            "framing": {"frame_source": "raw decode", "frame_cache": frame_cache},
         }
         if saved_frames_dir is not None:
             self.input_info["saved_frames_dir"] = str(saved_frames_dir.resolve())

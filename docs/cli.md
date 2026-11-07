@@ -104,7 +104,15 @@ Default: auto-detect (CUDA > MPS > CPU).
 | Option | Description |
 |--------|-------------|
 | `--frame-interval SEC` | Seconds between extracted frames (default: 0.5) |
-| `--save-frames DIR` | Save extracted frames to directory |
+| `--save-frames DIR` | Save viewing copies of the frames to directory (default: beside the output) |
+| `--no-save-frames` | Do not save viewing copies |
+| `--frame-format {jpg,png}` | Format of the viewing copies (default: jpg, quality 85) |
+
+Models always score the decoded frames, never the saved copies. When frames
+must go to disk (`--parallel` with several models, or when the frames would
+exceed 80 % of available memory), the scoring copies are lossless PNG in a
+temporary directory. The sidecar records this as `input.framing`
+(`frame_source: "raw decode"`, `frame_cache: "memory" | "png"`).
 
 ### HDF5 Options
 

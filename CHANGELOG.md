@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-11-07
+
+### Fixed
+
+- **Video features are always scored on the decoded frames.** Before this
+  release, the CLI scored JPEG (quality 85) copies of the frames whenever they
+  went to disk: on `--save-frames` (the default unless `--no-save-frames`), on
+  `--parallel` runs with several models, and, silently, when the estimated
+  frame memory exceeded 80 % of available. JPEG moves some models' features a
+  long way (clip, ebind and aesthetics correlate about .95 with the same model
+  on decoded frames), so the same video and model could emit different
+  features depending on flags and node memory, and the sidecar did not say
+  which. Saved frames are now viewing copies only; frames cached on disk for
+  scoring are lossless PNG. Tables written with `--no-save-frames`, without
+  `--parallel` and without the memory fallback were already scored on decoded
+  frames and are unchanged.
+
+### Changed
+
+- **Contract B schema 1.3:** video sidecars carry `input.framing` =
+  `{"frame_source": "raw decode", "frame_cache": "memory" | "png"}`. Absent
+  means unrecorded (written before 0.15.0). `viz2psy sidecar refresh` cannot
+  recover it, so it refreshes a video sidecar without it to 1.2 at most;
+  image and HDF5 sidecars refresh to 1.3.
+- `viz2psy.video.extract_frames` gains `view_dir` / `view_format` (viewing
+  copies that are never returned). `extract_frames_to_temp` always writes
+  lossless PNG and drops `frame_format` in favour of `view_dir` /
+  `view_format`. PNG frames are written at compress level 1 (lossless,
+  faster to write, larger on disk).
+
 ## [0.14.0] - 2026-11-05
 
 Feature values are unchanged; nothing needs re-extracting. Existing sidecars
