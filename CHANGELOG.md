@@ -17,7 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lit in any non-black frame; never crops a pixel that was ever shown) plus a
   robust box (lines sparse in at least half the frames) used only to flag
   files where subtitles or credits cross a bar. Files are also flagged for a
-  large crop (> 30 %) or lopsided bars. `sheet` draws review contact sheets
+  large crop (> 30 %), lopsided bars, or a cropped band that is not black
+  (`dim_band`: a dark picture edge that never exceeds the darkness threshold
+  is cropped like a bar, but still carries detail; each band's level is
+  recorded as `band_<edge>`). `sheet` draws review contact sheets
   (per-pixel max over all frames + 11 frames, box drawn). `finalize` merges a
   hand-edited overrides file (`confirm`/`override`, each with a reason) and
   refuses while a flagged file is unreviewed. Tables carry a sha256-pinned

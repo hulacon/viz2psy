@@ -65,6 +65,12 @@ def vids(tmp_path_factory):
     out["fade"] = write_ffv1(d / "fade.mkv", fade)
     out["large"] = write_ffv1(d / "large.mkv", letterboxed(20, 20))
     out["lopsided"] = write_ffv1(d / "lopsided.mkv", letterboxed(6, 18))
+    # A dark picture edge: the right 20 columns never exceed luma 24 but are
+    # not black (values 10-20). The strict rule crops them; dim_band flags it.
+    dim = letterboxed(12, 12)
+    for f in dim:
+        f[12:H - 12, W - 20:] = RNG.integers(10, 21, (H - 24, 20, 3))
+    out["dim_edge"] = write_ffv1(d / "dim_edge.mkv", dim)
     return out
 
 
@@ -111,6 +117,16 @@ def test_fade_frames_are_skipped(vids):
 def test_large_and_lopsided_flags(vids):
     assert "large_crop" in framing.detect(vids["large"], interval=0.5)["flags"]  # 40/96 rows
     assert "lopsided" in framing.detect(vids["lopsided"], interval=0.5)["flags"]
+
+
+def test_dark_picture_edge_flags_dim_band(vids):
+    r = framing.detect(vids["dim_edge"], interval=0.5)
+    assert box(r) == (0, 20, 12, 12)  # cropped like a bar ...
+    assert r["band_right"] > framing.DIM_BAND  # ... but it is not black
+    assert r["band_top"] == 0.0 and "dim_band" in r["flags"]
+    clean = framing.detect(vids["letterbox"], interval=0.5)
+    assert clean["band_left"] == "" and clean["band_top"] == 0.0
+    assert "dim_band" not in clean["flags"]
 
 
 def test_missing_file_is_a_row_error(tmp_path):

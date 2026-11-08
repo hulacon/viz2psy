@@ -32,7 +32,16 @@ so the box is in the same pixel coordinates the models see):
 Flags: ``strict_robust_disagree`` (any edge differs by more than
 max(2 px, 1 % of that dimension)); ``large_crop`` (the box removes more than
 30 % of the frame); ``lopsided`` (opposite bars differ by more than
-max(2 px, 1 %) and both are non-zero); ``no_frames`` (nothing lit was decoded).
+max(2 px, 1 %) and both are non-zero); ``dim_band`` (a cropped band is not
+black: see below); ``no_frames`` (nothing lit was decoded).
+
+**Band level.** A dark picture edge that never rises above ``dark`` is
+cropped by the strict rule exactly like a bar. What separates them is the
+black level: a letterbox bar is flat black (luma ~0-6 after compression),
+while a dark picture still carries detail. For each cropped band wider than
+``BAND_GUARD`` lines, ``band_<edge>`` is the median over lit frames of the
+band's maximum luma, excluding the ``BAND_GUARD`` lines nearest the picture
+(compression ringing). Above ``DIM_BAND`` the file is flagged ``dim_band``.
 
 The table stores the box in decoded pixel coordinates. Squaring the pixels
 (the stream's sample aspect ratio, ``sar``) happens after the crop; the
@@ -61,12 +70,14 @@ import numpy as np
 from viz2psy.exceptions import Viz2PsyError
 
 #: Bump when the detection rule (not just a default) changes meaning.
-RULE_VERSION = "1"
+RULE_VERSION = "2"  # 2: band levels + dim_band flag
 DEFAULT_INTERVAL = 1.0
 DEFAULT_DARK = 24.0
 DEFAULT_ROBUST = 0.5
 DEFAULT_SPARSE = 0.25
 LARGE_CROP = 0.30
+BAND_GUARD = 2
+DIM_BAND = 8.0
 LUMA = np.array([0.299, 0.587, 0.114])
 EDGES = ("left", "right", "top", "bottom")
 
@@ -77,6 +88,7 @@ DETECT_COLUMNS = [
     "crop_left", "crop_right", "crop_top", "crop_bottom",
     "robust_left", "robust_right", "robust_top", "robust_bottom",
     "active_w", "active_h", "display_aspect", "removed_frac",
+    "band_left", "band_right", "band_top", "band_bottom",
     "flags", "error",
 ]
 REVIEW_COLUMNS = ["box_source", "review", "review_reason", "reviewer"]
@@ -116,6 +128,8 @@ class LitCounts:
     cols_sparse: np.ndarray
     n_sampled: int = 0
     n_lit: int = 0
+    row_max: list = None  # per lit frame: each row's max luma (for band levels)
+    col_max: list = None
 
     @classmethod
     def accumulate(cls, frames, dark: float = DEFAULT_DARK,
@@ -125,7 +139,7 @@ class LitCounts:
             luma = frame.astype(np.float32) @ LUMA.astype(np.float32)
             if acc is None:
                 h, w = luma.shape
-                acc = cls(*(np.zeros(n, np.int64) for n in (h, w, h, w)))
+                acc = cls(*(np.zeros(n, np.int64) for n in (h, w, h, w)), row_max=[], col_max=[])
             elif luma.shape != (len(acc.rows), len(acc.cols)):
                 raise FramingError(f"frame size changed mid-stream: {luma.shape} after "
                                    f"{(len(acc.rows), len(acc.cols))}")
@@ -138,6 +152,8 @@ class LitCounts:
             acc.cols += lit.any(axis=0)
             acc.rows_sparse += lit.mean(axis=1) <= sparse
             acc.cols_sparse += lit.mean(axis=0) <= sparse
+            acc.row_max.append(luma.max(axis=1).astype(np.float16))
+            acc.col_max.append(luma.max(axis=0).astype(np.float16))
         if acc is None:
             raise FramingError("no frames decoded")
         return acc
@@ -148,6 +164,21 @@ class LitCounts:
         left, right = _edge_run(self.cols == 0)
         return {"left": left, "right": right, "top": top, "bottom": bottom}
 
+    def band_levels(self, box: dict[str, int]) -> dict[str, float | None]:
+        """Median over lit frames of each cropped band's max luma (see module doc)."""
+        if not self.row_max:
+            return {e: None for e in EDGES}
+        rm = np.asarray(self.row_max, np.float32)
+        cm = np.asarray(self.col_max, np.float32)
+        h, w = rm.shape[1], cm.shape[1]
+        g = BAND_GUARD
+        spans = {"top": (rm, 0, box["top"] - g), "bottom": (rm, h - box["bottom"] + g, h),
+                 "left": (cm, 0, box["left"] - g), "right": (cm, w - box["right"] + g, w)}
+        out = {}
+        for e, (m, a, b) in spans.items():
+            out[e] = round(float(np.median(m[:, a:b].max(axis=1))), 2) if b - a > 0 else None
+        return out
+
     def robust_box(self, robust: float = DEFAULT_ROBUST) -> dict[str, int]:
         """Bars: lines sparse in at least ``robust`` of the lit frames."""
         need = robust * self.n_lit
@@ -156,7 +187,8 @@ class LitCounts:
         return {"left": left, "right": right, "top": top, "bottom": bottom}
 
 
-def flags_for(strict: dict, robust: dict, width: int, height: int, n_lit: int) -> list[str]:
+def flags_for(strict: dict, robust: dict, width: int, height: int, n_lit: int,
+              bands: dict | None = None) -> list[str]:
     if n_lit == 0:
         return ["no_frames"]
     flags = []
@@ -171,6 +203,8 @@ def flags_for(strict: dict, robust: dict, width: int, height: int, n_lit: int) -
         if strict[a] and strict[b] and abs(strict[a] - strict[b]) > _tol(dim):
             flags.append("lopsided")
             break
+    if bands and any(v is not None and v > DIM_BAND for v in bands.values()):
+        flags.append("dim_band")
     return flags
 
 
@@ -189,6 +223,7 @@ def detect(video_path: str | Path, interval: float = DEFAULT_INTERVAL,
         h, w = len(acc.rows), len(acc.cols)
         strict = acc.strict_box()
         rob = acc.robust_box(robust)
+        bands = acc.band_levels(strict)
         aw = w - strict["left"] - strict["right"]
         ah = h - strict["top"] - strict["bottom"]
         row.update(width=w, height=h, n_sampled=acc.n_sampled, n_lit=acc.n_lit,
@@ -197,7 +232,8 @@ def detect(video_path: str | Path, interval: float = DEFAULT_INTERVAL,
                    active_w=aw, active_h=ah,
                    display_aspect=round(aw * row["sar"] / ah, 4) if ah > 0 else "",
                    removed_frac=round(1 - max(aw, 0) * max(ah, 0) / (w * h), 4),
-                   flags=";".join(flags_for(strict, rob, w, h, acc.n_lit)))
+                   **{f"band_{e}": ("" if bands[e] is None else bands[e]) for e in EDGES},
+                   flags=";".join(flags_for(strict, rob, w, h, acc.n_lit, bands)))
     except Exception as e:  # noqa: BLE001 -- recorded per row, and a table with errors cannot finalize
         row["error"] = f"{type(e).__name__}: {e}"[:300]
     return row
@@ -476,7 +512,8 @@ def main(argv: list[str]) -> int:
         write_table(rows, args.output, DETECT_COLUMNS, {
             "stage": "detected", "rule_version": RULE_VERSION, **kw,
             "luma": "BT.601 (0.299, 0.587, 0.114) over decoded RGB",
-            "large_crop": LARGE_CROP, "detected_by": f"viz2psy {__version__}",
+            "large_crop": LARGE_CROP, "band_guard": BAND_GUARD, "dim_band": DIM_BAND,
+            "detected_by": f"viz2psy {__version__}",
             "detected_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         })
         n_err = sum(bool(r.get("error")) for r in rows)
