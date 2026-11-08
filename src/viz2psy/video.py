@@ -256,6 +256,62 @@ def extract_frames(
     if not video_path.exists():
         raise VideoError(video_path, "file not found")
 
+    if save_dir:
+        save_dir = Path(save_dir)
+        save_dir.mkdir(parents=True, exist_ok=True)
+    if view_dir:
+        view_dir = Path(view_dir)
+        view_dir.mkdir(parents=True, exist_ok=True)
+
+    frames = []
+    n_blank = n_frozen = 0
+    previous = None
+    for t, frame_rgb in iter_frames(video_path, frame_interval, quiet=quiet):
+        n_blank += int(frame_rgb.min() == frame_rgb.max())
+        n_frozen += int(previous is not None and np.array_equal(frame_rgb, previous))
+        previous = frame_rgb
+        pil_image = Image.fromarray(frame_rgb)
+
+        if view_dir:
+            _save_frame(pil_image, view_dir, t, view_format)
+        if save_dir:
+            frames.append((t, _save_frame(pil_image, save_dir, t, frame_format)))
+        else:
+            frames.append((t, pil_image))
+
+    if frames and n_blank / len(frames) > MAX_BLANK_FRAME_FRACTION:
+        raise VideoError(
+            video_path,
+            f"{n_blank} of {len(frames)} decoded frames are a single uniform colour; "
+            "refusing to score them (a decode failure, e.g. an interlaced source "
+            "the decoder could not convert)",
+        )
+    if (len(frames) >= MIN_FRAMES_FOR_FROZEN_CHECK
+            and n_frozen / (len(frames) - 1) > MAX_FROZEN_FRAME_FRACTION):
+        raise VideoError(
+            video_path,
+            f"{n_frozen} of {len(frames) - 1} sampled frames are bit-identical to the "
+            "previous one; refusing to score a frozen decode (if the video really "
+            "never changes, score it as an image)",
+        )
+    return frames
+
+
+def iter_frames(video_path: Path, frame_interval: float = 0.5, quiet: bool = True):
+    """Yield ``(time, rgb_uint8_array)`` at ``sample_times(duration, frame_interval)``.
+
+    The one decode path for video: :func:`extract_frames` scores these frames
+    and :mod:`viz2psy.framing` measures bars on them, so a framing box is in
+    the coordinates of the frames the models see. Progressive sources are
+    read with OpenCV; interlaced sources are deinterlaced and read with PyAV
+    (``iter_native_frames``) at the same native frame indices. Stops at the
+    first timestamp the decoder cannot deliver. No blank/frozen checks here:
+    those are :func:`extract_frames`' refusals.
+    """
+    video_path = Path(video_path)
+    if not video_path.exists():
+        raise VideoError(video_path, "file not found")
+
     interlaced = is_interlaced(video_path)
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
@@ -268,26 +324,13 @@ def extract_frames(
         frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         duration = frame_count / fps if fps > 0 else 0
 
-        if save_dir:
-            save_dir = Path(save_dir)
-            save_dir.mkdir(parents=True, exist_ok=True)
-        if view_dir:
-            view_dir = Path(view_dir)
-            view_dir.mkdir(parents=True, exist_ok=True)
-
-        frames = []
         timestamps = sample_times(duration, frame_interval)
-
-        iterator = timestamps
-        if not quiet:
-            iterator = tqdm(timestamps, desc="Extracting frames")
+        iterator = timestamps if quiet else tqdm(timestamps, desc="Extracting frames")
 
         if interlaced:
             decoded = iter_native_frames(video_path, (frame_index(t, fps) for t in timestamps))
             pending = next(decoded, None)
 
-        n_blank = n_frozen = 0
-        previous = None
         for t in iterator:
             frame_num = frame_index(t, fps)
             if interlaced:
@@ -299,41 +342,11 @@ def extract_frames(
             else:
                 cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
                 ret, frame = cap.read()
-
                 if not ret:
                     break
-
                 # Convert BGR (OpenCV) to RGB (PIL)
                 frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            n_blank += int(frame_rgb.min() == frame_rgb.max())
-            n_frozen += int(previous is not None and np.array_equal(frame_rgb, previous))
-            previous = frame_rgb
-            pil_image = Image.fromarray(frame_rgb)
-
-            if view_dir:
-                _save_frame(pil_image, view_dir, t, view_format)
-            if save_dir:
-                frames.append((t, _save_frame(pil_image, save_dir, t, frame_format)))
-            else:
-                frames.append((t, pil_image))
-
-        if frames and n_blank / len(frames) > MAX_BLANK_FRAME_FRACTION:
-            raise VideoError(
-                video_path,
-                f"{n_blank} of {len(frames)} decoded frames are a single uniform colour; "
-                "refusing to score them (a decode failure, e.g. an interlaced source "
-                "the decoder could not convert)",
-            )
-        if (len(frames) >= MIN_FRAMES_FOR_FROZEN_CHECK
-                and n_frozen / (len(frames) - 1) > MAX_FROZEN_FRAME_FRACTION):
-            raise VideoError(
-                video_path,
-                f"{n_frozen} of {len(frames) - 1} sampled frames are bit-identical to the "
-                "previous one; refusing to score a frozen decode (if the video really "
-                "never changes, score it as an image)",
-            )
-        return frames
-
+            yield t, frame_rgb
     finally:
         cap.release()
 

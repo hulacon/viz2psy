@@ -940,6 +940,10 @@ def main():
         from viz2psy.sidecar import main as sidecar_main
 
         sys.exit(sidecar_main(sys.argv[2:]))
+    if len(sys.argv) > 1 and sys.argv[1] == "framing":
+        from viz2psy.framing import main as framing_main
+
+        sys.exit(framing_main(sys.argv[2:]))
     parser = argparse.ArgumentParser(
         description="Extract psychological/perceptual features from images, videos, or HDF5 bricks.",
         formatter_class=argparse.RawDescriptionHelpFormatter,

@@ -251,6 +251,44 @@ This sidecar is used by `viz2psy-viz` for:
 
 ---
 
+## Framing Tables (`viz2psy framing`)
+
+A framing table holds one letterbox/pillarbox crop box per video file. It is
+detected once per file, not frame by frame, because a dark scene or a fade
+looks like a bar in any single frame. Boxes are in the pixel coordinates of
+the frames the models score (the same decode loop, `viz2psy.video.iter_frames`).
+
+```bash
+# 1. Detect: strict + robust box per file, flags, band levels (1 frame/s)
+viz2psy framing detect --list videos.txt -o detected.csv -j 8
+
+# 2. Review: contact sheets (max-over-all-frames panel + 11 frames, box drawn)
+viz2psy framing sheet detected.csv --out-dir sheets/ --select flagged
+
+# 3. Finalize: merge reviewed decisions; refuses while a flagged file is unreviewed
+viz2psy framing finalize detected.csv --overrides overrides.csv -o framing_table.csv
+```
+
+- **Strict box** (the one used): lines never lit (luma > `--dark`, default 24)
+  in any non-black frame, so it never crops a pixel that was ever shown.
+- **Robust box** (flag only): lines lit in at most `--sparse` (25 %) of their
+  pixels in at least `--robust` (50 %) of lit frames. When it disagrees with
+  the strict box, subtitles or credits probably cross a bar.
+- **Flags**: `strict_robust_disagree`, `large_crop` (> 30 % removed),
+  `lopsided`, `dim_band` (a cropped band brighter than near-black: a dark
+  picture edge that never exceeds `--dark` is cropped like a bar but still
+  carries detail; each band's level is in `band_<edge>`), `no_frames`.
+- **Overrides CSV**: columns `path, decision, reason, reviewer, crop_left,
+  crop_right, crop_top, crop_bottom`. `decision` is `confirm` or `override`
+  (box columns required for `override`); every row needs a reason.
+- **Keys**: rows are keyed on the absolute path as given, never a resolved
+  symlink (git-annex trees key on the stimulus path, not the annex object).
+  Lookup fails loudly on a missing path or a changed file size.
+- Every table is written with a `.json` parameter record that pins its
+  sha256; a table edited by hand refuses to load.
+
+---
+
 ## Performance Tips
 
 1. **Use GPU**: CUDA is fastest, MPS (Apple Silicon) is good, CPU is slowest

@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-11-07
+
+### Added
+- `viz2psy framing {detect,finalize,sheet}`: one letterbox/pillarbox crop box
+  per video file (the *framing table*), detected once per file rather than
+  on the fly, because a dark scene or a fade looks like a bar in any single
+  frame. `detect` samples at 1 frame/s and writes a strict box (lines never
+  lit in any non-black frame; never crops a pixel that was ever shown) plus a
+  robust box (lines sparse in at least half the frames) used only to flag
+  files where subtitles or credits cross a bar. Files are also flagged for a
+  large crop (> 30 %), lopsided bars, or a cropped band that is not black
+  (`dim_band`: a dark picture edge that never exceeds the darkness threshold
+  is cropped like a bar, but still carries detail; each band's level is
+  recorded as `band_<edge>`). `sheet` draws review contact sheets
+  (per-pixel max over all frames + 11 frames, box drawn). `finalize` merges a
+  hand-edited overrides file (`confirm`/`override`, each with a reason) and
+  refuses while a flagged file is unreviewed. Tables carry a sha256-pinned
+  parameter record; a table edited by hand, or a source missing from it or
+  changed since detection, is a loud error. The table's reader for
+  extraction (`--framing-table`) follows in a later release.
+
+### Changed
+- The video decode loop is now `viz2psy.video.iter_frames`, shared by
+  `extract_frames` (scoring) and `framing` (bar detection), so a framing box
+  is in the pixel coordinates of the frames the models score. Frames are
+  unchanged.
+
 ## [0.15.0] - 2026-11-07
 
 ### Fixed
