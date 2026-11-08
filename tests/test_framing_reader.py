@@ -225,14 +225,27 @@ def test_llstat_canonical_area():
     assert m.predict(nsd)  # unchanged size path
 
 
+def _model_class(name):
+    """Load a model class; skip when its third-party backend is not installed.
+
+    A missing viz2psy module is a real error and still fails.
+    """
+    try:
+        return cli._load_model_class(name)
+    except ModuleNotFoundError as e:
+        if (e.name or "").split(".")[0] == "viz2psy":
+            raise
+        pytest.skip(f"{name}: backend {e.name!r} not installed")
+
+
 @pytest.mark.parametrize("name", sorted(cli.MODEL_REGISTRY))
 def test_every_model_records_its_preprocessing(name):
-    describe = getattr(cli._load_model_class(name), "describe_preprocessing", None)
+    describe = getattr(_model_class(name), "describe_preprocessing", None)
     assert describe is not None, f"{name} has no describe_preprocessing()"
     assert isinstance(describe(), dict) and describe()
 
 
 @pytest.mark.parametrize("name", ["clip", "aesthetics", "ebind", "dinov2", "places"])
 def test_crop_networks_squash(name):
-    rec = cli._load_model_class(name).describe_preprocessing()
+    rec = _model_class(name).describe_preprocessing()
     assert rec["square"].startswith("squash")
