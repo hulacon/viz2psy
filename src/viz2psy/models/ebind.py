@@ -17,7 +17,7 @@ First >999-d space in the family: embedding indices are fixed-width
 import torch
 from PIL import Image
 
-from .base import BaseModel
+from .base import SQUASH_RECORD, BaseModel, squash_to_square
 
 DEFAULT_CHECKPOINT = "encord-team/ebind-full"
 # The hub snapshot of DEFAULT_CHECKPOINT the family's features were extracted
@@ -52,6 +52,11 @@ class EBindModel(BaseModel):
         self.revision = DEFAULT_REVISION if checkpoint == DEFAULT_CHECKPOINT else "main"
         self._transform = None
 
+    @staticmethod
+    def describe_preprocessing() -> dict:
+        """The input transform, as recorded in the sidecar (framing D2: squash)."""
+        return {**SQUASH_RECORD, "then": "the model's own transform: resize to its input size, then centre crop (removes nothing on a square)"}
+
     def load(self) -> None:
         from ebind import EBindModel as _EBind
         from ebind.configuration import EBindConfig
@@ -71,7 +76,7 @@ class EBindModel(BaseModel):
         return self.predict_batch([image])[0]
 
     def predict_batch(self, images: list[Image.Image]) -> list[dict[str, float]]:
-        batch = torch.stack([self._transform(img) for img in images]).to(self.device)
+        batch = torch.stack([self._transform(squash_to_square(img)) for img in images]).to(self.device)
         with torch.no_grad():
             features = self.model.forward(image=batch)["image"].float()
             features = features / features.norm(dim=-1, keepdim=True)

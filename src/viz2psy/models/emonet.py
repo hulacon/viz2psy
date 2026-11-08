@@ -143,6 +143,11 @@ class EmoNetModel(BaseModel):
         super().__init__(device=device)
         self.weights_path = Path(weights_path) if weights_path else _DEFAULT_WEIGHTS_PATH
 
+    @staticmethod
+    def describe_preprocessing() -> dict:
+        """The input transform, as recorded in the sidecar."""
+        return {'square': 'squash to 227 x 227 (aspect not kept)', 'interpolation': 'bilinear'}
+
     def load(self) -> None:
         self.model = _EmoNetArch(num_classes=20)
         self._ensure_weights()

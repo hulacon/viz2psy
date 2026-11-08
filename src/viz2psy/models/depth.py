@@ -78,6 +78,11 @@ class DepthModel(BaseModel):
         },
     }
 
+    @staticmethod
+    def describe_preprocessing() -> dict:
+        """The input transform, as recorded in the sidecar."""
+        return {'resize': 'Depth Anything V2 processor: aspect kept, short side ~518 px, multiple of 14', 'interpolation': 'bicubic'}
+
     def load(self) -> None:
         from transformers import AutoImageProcessor, AutoModelForDepthEstimation
 

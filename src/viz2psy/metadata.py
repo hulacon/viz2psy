@@ -223,6 +223,11 @@ def build_feature_definitions(model_features: dict[str, list[str]]) -> dict[str,
     return definitions
 
 
+def _still_framing() -> dict:
+    from viz2psy.framing import STILL_FRAMING
+    return dict(STILL_FRAMING)
+
+
 class MetadataBuilder:
     """Builder for output metadata."""
 
@@ -242,7 +247,8 @@ class MetadataBuilder:
             "type": "hdf5_brick",
             "path": str(path.resolve()),
             "dataset": dataset,
-            "indices": [start_idx, end_idx]
+            "indices": [start_idx, end_idx],
+            "framing": _still_framing(),
         }
         self.index_column = "image_idx"
 
@@ -251,7 +257,8 @@ class MetadataBuilder:
         self.input_info = {
             "type": "image_folder",
             "paths": [str(p.resolve()) for p in paths],
-            "count": len(paths)
+            "count": len(paths),
+            "framing": _still_framing(),
         }
         self.index_column = "filename"
 
@@ -263,20 +270,23 @@ class MetadataBuilder:
         saved_frames_dir: Path | None = None,
         frame_format: str = "jpg",
         frame_cache: str = "memory",
+        stage0: dict | None = None,
     ):
         """Set input info for video file.
 
         ``framing`` (schema 1.3) records what the models scored: always the
         decoded frames (``frame_source``), held in memory or cached on disk
-        as lossless PNG (``frame_cache``). ``saved_frames_*`` describe viewing
-        copies only; models never read them.
+        as lossless PNG (``frame_cache``), after stage 0 of the framing rule
+        (``stage0``: :meth:`viz2psy.framing.Stage0.record`). ``saved_frames_*``
+        describe viewing copies only; models never read them.
         """
         self.input_info = {
             "type": "video",
             "path": str(path.resolve()),
             "frame_interval_sec": frame_interval,
             "n_frames": n_frames,
-            "framing": {"frame_source": "raw decode", "frame_cache": frame_cache},
+            "framing": {"frame_source": "raw decode", "frame_cache": frame_cache,
+                        **(stage0 or {})},
         }
         if saved_frames_dir is not None:
             self.input_info["saved_frames_dir"] = str(saved_frames_dir.resolve())

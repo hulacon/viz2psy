@@ -98,6 +98,11 @@ class MotionModel(BaseModel):
     }
     video_only = True
 
+    @staticmethod
+    def describe_preprocessing() -> dict:
+        """The input transform, as recorded in the sidecar."""
+        return {'resize': 'grayscale, downscaled to 240 px tall (aspect kept); Farneback flow to the next native frame', 'interpolation': 'area'}
+
     def load(self) -> None:
         import cv2
 
@@ -114,12 +119,17 @@ class MotionModel(BaseModel):
         video_path: str | Path,
         times: list[float],
         quiet: bool = False,
+        stage0=None,
     ) -> list[dict[str, float]]:
         """Score the video at the given timestamps (one dict per timestamp).
 
         ``times`` is the caller's frame grid, so the rows align exactly
-        with the per-frame models' rows.
+        with the per-frame models' rows. ``stage0`` (a
+        :class:`viz2psy.framing.Stage0`) crops the bars and squares the
+        pixels of every frame read, as for the per-frame models, so frame
+        heights and the radial centre are the picture's, not the file's.
         """
+        self._stage0 = stage0
         cv2 = self.model
         video_path = Path(video_path)
         cap = cv2.VideoCapture(str(video_path))
@@ -215,8 +225,11 @@ class MotionModel(BaseModel):
         }
 
     def _prepare(self, frame_bgr: np.ndarray) -> np.ndarray:
-        """Grayscale + downscale to WORK_HEIGHT (keep aspect)."""
+        """Stage 0 (if set), then grayscale + downscale to WORK_HEIGHT (keep aspect)."""
         cv2 = self.model
+        stage0 = getattr(self, "_stage0", None)
+        if stage0 is not None:
+            frame_bgr = stage0.apply(frame_bgr)
         gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
         h, w = gray.shape
         if h > WORK_HEIGHT:

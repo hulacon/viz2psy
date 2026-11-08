@@ -124,6 +124,11 @@ class GISTModel(BaseModel):
         self.image_size = image_size
         self._kernels: list[np.ndarray] = []
 
+    @staticmethod
+    def describe_preprocessing() -> dict:
+        """The input transform, as recorded in the sidecar."""
+        return {'square': 'squash to 256 x 256 (aspect not kept), then grayscale; 4 x 4 grid over the whole picture', 'interpolation': 'lanczos'}
+
     def load(self) -> None:
         """Pre-compute the Gabor filter bank (no learned weights)."""
         self._kernels = _build_gabor_bank(self.n_orientations, self.frequencies)

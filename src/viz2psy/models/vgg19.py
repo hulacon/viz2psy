@@ -115,6 +115,11 @@ class VGG19Model(BaseModel):
             for size in (224, 112)
         }
 
+    @staticmethod
+    def describe_preprocessing() -> dict:
+        """The input transform, as recorded in the sidecar."""
+        return {'square': 'squash to 224 x 224 (pre-ReLU set) and 112 x 112 (post-ReLU block set); aspect not kept', 'interpolation': 'bilinear'}
+
     def load(self) -> None:
         from torchvision.models import VGG19_Weights, vgg19
 

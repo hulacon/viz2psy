@@ -301,6 +301,115 @@ def lookup(rows: dict[str, dict], video_path: str | Path) -> dict:
     return r
 
 
+# --------------------------------------------------------------------------- stage 0 (the reader)
+
+#: Bump when what stage 0 does to a frame changes meaning.
+STAGE0_VERSION = "1"
+SAR_TOL = 1e-5
+
+
+@dataclass(frozen=True)
+class Stage0:
+    """Stage 0 of the framing rule for one video: the picture every model scores.
+
+    Each decoded frame is cropped to the table's box (decoded pixel
+    coordinates), then resized to square pixels: the cropped width times the
+    stream's sample aspect ratio, rounded, by the cropped height (bicubic).
+    Without a table nothing is cropped and only the pixels are squared.
+    """
+
+    stored_w: int
+    stored_h: int
+    sar: float
+    crop: dict  # {left, right, top, bottom} in decoded pixels
+    table: str | None = None
+    table_sha256: str | None = None
+    detect_rule_version: str | None = None
+    box_source: str | None = None
+
+    @property
+    def crop_wh(self) -> tuple[int, int]:
+        c = self.crop
+        return (self.stored_w - c["left"] - c["right"], self.stored_h - c["top"] - c["bottom"])
+
+    @property
+    def active_wh(self) -> tuple[int, int]:
+        """The picture's size after stage 0: square pixels at the cropped height."""
+        cw, ch = self.crop_wh
+        return (max(1, int(round(cw * self.sar))), ch)
+
+    @property
+    def is_identity(self) -> bool:
+        return self.active_wh == (self.stored_w, self.stored_h)
+
+    def apply(self, frame: np.ndarray) -> np.ndarray:
+        """Stage 0 on one decoded ``(H, W, C)`` uint8 frame (any channel order)."""
+        if frame.shape[:2] != (self.stored_h, self.stored_w):
+            raise FramingError(f"decoded frame is {frame.shape[1]}x{frame.shape[0]}, but stage 0 "
+                               f"was built for {self.stored_w}x{self.stored_h}"
+                               + (f" (framing table {self.table})" if self.table else ""))
+        if self.is_identity:
+            return frame
+        c = self.crop
+        out = frame[c["top"]:self.stored_h - c["bottom"], c["left"]:self.stored_w - c["right"]]
+        if self.active_wh != self.crop_wh:
+            from PIL import Image
+            out = np.asarray(Image.fromarray(np.ascontiguousarray(out))
+                             .resize(self.active_wh, Image.BICUBIC))
+        return out
+
+    def record(self) -> dict:
+        """The sidecar's ``input.framing`` fields for stage 0 (merged with the frame source)."""
+        return {
+            "stage0": "framing table" if self.table else
+                      "no framing table: pixels squared, nothing cropped",
+            "stage0_version": STAGE0_VERSION,
+            "stored_wh": [self.stored_w, self.stored_h],
+            "pixel_aspect": self.sar,
+            "crop": dict(self.crop),
+            "active_wh": list(self.active_wh),
+            "framing_table": self.table,
+            "framing_table_sha256": self.table_sha256,
+            "detect_rule_version": self.detect_rule_version,
+            "box_source": self.box_source,
+        }
+
+
+#: ``input.framing`` for still images (HDF5 bricks and image files): stage 0
+#: is a no-op, recorded so a stills group and a video group are told apart.
+STILL_FRAMING = {
+    "frame_source": "still image",
+    "stage0": "none: still image (square pixels, no bars assumed)",
+    "stage0_version": STAGE0_VERSION,
+}
+
+
+def stage0_for(video_path: str | Path, table: str | Path | None = None) -> Stage0:
+    """Stage 0 for ``video_path``, from a framing table or (``table=None``) SAR only.
+
+    With a table, the source must be in it (keyed by :func:`source_key`) with
+    the same size in bytes, and the stream's sample aspect ratio must match
+    the one detected; anything else is a loud :class:`FramingError`.
+    """
+    from viz2psy.video import get_video_info
+
+    info = get_video_info(Path(video_path))
+    sar = float(info["pixel_aspect"])
+    if table is None:
+        return Stage0(int(info["width"]), int(info["height"]), sar,
+                      {e: 0 for e in EDGES})
+    rows, params = read_table(table)
+    r = lookup(rows, video_path)
+    if abs(float(r["sar"]) - sar) > SAR_TOL:
+        raise FramingError(f"{r['path']}: stream pixel aspect {sar:.6f} != the table's {r['sar']}; "
+                           "re-detect it")
+    return Stage0(int(r["width"]), int(r["height"]), float(r["sar"]),
+                  {e: int(r[f"crop_{e}"]) for e in EDGES},
+                  table=str(Path(table).absolute()), table_sha256=params["sha256"],
+                  detect_rule_version=str(params.get("rule_version")),
+                  box_source=r.get("box_source") or None)
+
+
 # --------------------------------------------------------------------------- finalize
 
 def finalize(detected: Path, overrides: Path | None, out: Path,

@@ -6,7 +6,7 @@ from scipy.fft import fft2, fftshift
 from skimage.color import rgb2lab
 from skimage.feature import canny
 
-from .base import BaseModel
+from .base import CANONICAL_AREA, BaseModel, canonical_size
 
 #: Mean relative luminance (0-1) below which RMS contrast is undefined.
 #: ``std / mean`` is unbounded as the mean goes to 0: near-black film frames
@@ -96,12 +96,25 @@ class LLStatModel(BaseModel):
         },
     }
 
+    @staticmethod
+    def describe_preprocessing() -> dict:
+        """The input resize, as recorded in the sidecar (framing D3)."""
+        return {"resize": "canonical pixel area at the picture's aspect ratio",
+                "canonical_area": CANONICAL_AREA, "interpolation": "bicubic"}
+
     def load(self) -> None:
         """No model to load — all features are computed analytically."""
         self.model = None
 
     def predict(self, image: Image.Image) -> dict[str, float]:
-        rgb = np.array(image.convert("RGB"), dtype=np.float64) / 255.0
+        # The spectral and edge columns depend on absolute pixel scale, so
+        # every picture is scored at one pixel area (saliency's; NSD's 425 x
+        # 425 is unchanged), keeping its aspect ratio.
+        image = image.convert("RGB")
+        size = canonical_size(image.width, image.height)
+        if size != image.size:
+            image = image.resize(size, Image.BICUBIC)
+        rgb = np.array(image, dtype=np.float64) / 255.0
 
         # Luminance (BT.601).
         lum = _luminance(rgb)

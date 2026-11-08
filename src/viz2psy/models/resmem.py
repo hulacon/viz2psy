@@ -26,6 +26,11 @@ class ResMemModel(BaseModel):
         "columns": {},
     }
 
+    @staticmethod
+    def describe_preprocessing() -> dict:
+        """The input transform, as recorded in the sidecar."""
+        return {'square': 'squash to 256 x 256 (aspect not kept), then centre crop 227', 'interpolation': 'bilinear'}
+
     def load(self) -> None:
         self.model = ResMem(pretrained=True)
         self.model.eval()
