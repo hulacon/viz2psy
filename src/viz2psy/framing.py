@@ -38,9 +38,12 @@ The table stores the box in decoded pixel coordinates. Squaring the pixels
 (the stream's sample aspect ratio, ``sar``) happens after the crop; the
 active picture's display aspect is ``active_w * sar / active_h``.
 
-A table is keyed on the source's resolved absolute path, and records its size
-in bytes, so a file that changed or moved after detection is a loud error, not
-a stale box.
+A table is keyed on the source's absolute path **without following symlinks**
+(``source_key``): git-annex and DataLad trees store videos as symlinks into
+content-addressed objects, and a resolved key would name the object, not the
+stimulus. It records the size in bytes, so a file that changed or moved after
+detection, or a path spelled differently from the one detected, is a loud
+error, not a stale box.
 """
 
 from __future__ import annotations
@@ -91,6 +94,11 @@ def _edge_run(is_bar: np.ndarray) -> tuple[int, int]:
     if len(not_bar) == 0:
         return n, 0
     return int(not_bar[0]), int(n - 1 - not_bar[-1])
+
+
+def source_key(video_path: str | Path) -> str:
+    """The table key: absolute and normalised, symlinks kept (see module doc)."""
+    return os.path.abspath(video_path)
 
 
 def _tol(dim: int) -> float:
@@ -172,7 +180,7 @@ def detect(video_path: str | Path, interval: float = DEFAULT_INTERVAL,
     """One detected-table row for ``video_path``. Errors are recorded, never raised."""
     from viz2psy.video import get_pixel_aspect, iter_frames
 
-    path = Path(video_path).resolve()
+    path = Path(source_key(video_path))
     row: dict = {"path": str(path)}
     try:
         row["size_bytes"] = path.stat().st_size
@@ -243,11 +251,12 @@ def read_table(table: str | Path) -> tuple[dict[str, dict], dict]:
 
 def lookup(rows: dict[str, dict], video_path: str | Path) -> dict:
     """The table row for ``video_path``; a missing or changed source is a loud error."""
-    path = Path(video_path).resolve()
+    path = Path(source_key(video_path))
     r = rows.get(str(path))
     if r is None:
-        raise FramingError(f"{path} is not in the framing table; run `viz2psy framing detect` "
-                           "on it and review it before extracting")
+        raise FramingError(f"{path} is not in the framing table (keys are absolute paths, "
+                           "symlinks not followed); run `viz2psy framing detect` on it and "
+                           "review it before extracting")
     if r.get("error"):
         raise FramingError(f"{path}: the framing table records a detection error: {r['error']}")
     if int(r["size_bytes"]) != path.stat().st_size:
@@ -275,7 +284,7 @@ def finalize(detected: Path, overrides: Path | None, out: Path,
     if overrides is not None:
         with open(overrides, newline="") as fh:
             for o in csv.DictReader(fh):
-                p = str(Path(o["path"]).resolve())
+                p = source_key(o["path"])
                 if p in ov:
                     raise FramingError(f"overrides name {p} twice")
                 if p not in rows:

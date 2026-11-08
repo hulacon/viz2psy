@@ -145,11 +145,11 @@ def test_finalize_refuses_unreviewed_flags(vids, tmp_path):
 
 def test_finalize_applies_override_and_keeps_detected(vids, tmp_path):
     t = _detected(vids, tmp_path, ["letterbox", "subtitles"])
-    sub = str(vids["subtitles"].resolve())
+    sub = framing.source_key(vids["subtitles"])
     ov = _overrides(tmp_path / "ov.csv", [
         {"path": sub, "decision": "override", "reason": "subtitles in the bottom bar",
          "reviewer": "test", "crop_left": 0, "crop_right": 0, "crop_top": 12, "crop_bottom": 12},
-        {"path": str(vids["letterbox"].resolve()), "decision": "confirm", "reason": "clean"},
+        {"path": framing.source_key(vids["letterbox"]), "decision": "confirm", "reason": "clean"},
     ])
     out = tmp_path / "final.csv"
     s = framing.finalize(t, ov, out)
@@ -164,7 +164,7 @@ def test_finalize_applies_override_and_keeps_detected(vids, tmp_path):
 def test_finalize_needs_a_reason(vids, tmp_path):
     t = _detected(vids, tmp_path, ["letterbox"])
     ov = _overrides(tmp_path / "ov.csv", [
-        {"path": str(vids["letterbox"].resolve()), "decision": "confirm", "reason": ""}])
+        {"path": framing.source_key(vids["letterbox"]), "decision": "confirm", "reason": ""}])
     with pytest.raises(framing.FramingError, match="reason"):
         framing.finalize(t, ov, tmp_path / "final.csv")
 
@@ -181,7 +181,7 @@ def test_lookup_is_loud(vids, tmp_path):
     rows, _ = framing.read_table(t)
     with pytest.raises(framing.FramingError, match="not in the framing table"):
         framing.lookup(rows, vids["pillarbox"])
-    rows[str(vids["letterbox"].resolve())]["size_bytes"] = "1"
+    rows[framing.source_key(vids["letterbox"])]["size_bytes"] = "1"
     with pytest.raises(framing.FramingError, match="changed size"):
         framing.lookup(rows, vids["letterbox"])
 
@@ -204,3 +204,17 @@ def test_cli_detect_finalize(vids, tmp_path, capsys):
     assert params["stage"] == "detected" and params["n_rows"] == 2
     assert params["rule_version"] == framing.RULE_VERSION
     assert framing.main(["finalize", str(t), "-o", str(tmp_path / "f.csv")]) == 0
+
+
+def test_symlinked_source_keyed_on_the_link(vids, tmp_path):
+    """git-annex trees: the key is the stimulus path, never the annex object."""
+    link = tmp_path / "episode_s01e01a.mkv"
+    link.symlink_to(vids["letterbox"])
+    r = framing.detect(link, interval=0.5)
+    assert r["path"] == str(link) and box(r) == (0, 0, 12, 12)
+    t = tmp_path / "d.csv"
+    framing.write_table([r], t, framing.DETECT_COLUMNS, {"stage": "detected"})
+    rows, _ = framing.read_table(t)
+    assert framing.lookup(rows, link)["path"] == str(link)
+    with pytest.raises(framing.FramingError, match="not in the framing table"):
+        framing.lookup(rows, vids["letterbox"])  # the target is a different key
