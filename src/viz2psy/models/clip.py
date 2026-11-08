@@ -4,7 +4,7 @@ import torch
 import open_clip
 from PIL import Image
 
-from .base import BaseModel
+from .base import SQUASH_RECORD, BaseModel, squash_to_square
 
 _DEFAULT_MODEL_NAME = "ViT-B-32"
 _DEFAULT_PRETRAINED = "laion2b_s34b_b79k"
@@ -40,6 +40,11 @@ class CLIPModel(BaseModel):
         self.checkpoint = f"{model_name}/{pretrained}"
         self._preprocess = None
 
+    @staticmethod
+    def describe_preprocessing() -> dict:
+        """The input transform, as recorded in the sidecar (framing D2: squash)."""
+        return {**SQUASH_RECORD, "then": "the model's own transform: resize to its input size, then centre crop (removes nothing on a square)"}
+
     def load(self) -> None:
         model, _, preprocess = open_clip.create_model_and_transforms(
             self.model_name, pretrained=self.pretrained,
@@ -48,7 +53,7 @@ class CLIPModel(BaseModel):
         self._preprocess = preprocess
 
     def predict(self, image: Image.Image) -> dict[str, float]:
-        x = self._preprocess(image).unsqueeze(0).to(self.device)
+        x = self._preprocess(squash_to_square(image)).unsqueeze(0).to(self.device)
         with torch.no_grad():
             features = self.model.encode_image(x)
             features = features / features.norm(dim=-1, keepdim=True)
@@ -56,7 +61,7 @@ class CLIPModel(BaseModel):
         return {f"clip_{i:03d}": v for i, v in enumerate(emb)}
 
     def predict_batch(self, images: list[Image.Image]) -> list[dict[str, float]]:
-        tensors = [self._preprocess(img) for img in images]
+        tensors = [self._preprocess(squash_to_square(img)) for img in images]
         batch = torch.stack(tensors).to(self.device)
         with torch.no_grad():
             features = self.model.encode_image(batch)

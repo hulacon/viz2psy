@@ -44,6 +44,11 @@ class CaptionModel(BaseModel):
         self.max_length = max_length
         self._processor = None
 
+    @staticmethod
+    def describe_preprocessing() -> dict:
+        """The input transform, as recorded in the sidecar."""
+        return {'square': 'squash to 384 x 384 (BLIP processor; aspect not kept)', 'interpolation': 'bicubic'}
+
     def load(self) -> None:
         from transformers import BlipProcessor, BlipForConditionalGeneration
 

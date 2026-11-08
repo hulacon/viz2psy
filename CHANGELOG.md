@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-11-08
+
+### Added
+- `--framing-table`: the framing table's reader. Every video frame goes
+  through *stage 0* before any model sees it: crop to the file's reviewed bar
+  box, then resize to square pixels (cropped width x sample aspect ratio,
+  bicubic). A source missing from the table, changed since detection, or with
+  a different sample aspect ratio is an error. Without a table, pixels are
+  still squared and nothing is cropped. `motion` applies stage 0 to the
+  frames it reads itself, so its frame-height units and radial centre are the
+  picture's.
+- `input.framing` (Contract B 1.3, additive) records stage 0: `stage0`,
+  `stage0_version`, `stored_wh`, `pixel_aspect`, `crop`, `active_wh`,
+  `framing_table`, `framing_table_sha256`, `detect_rule_version`,
+  `box_source`. Still-image runs record `frame_source: "still image"`.
+- Every model declares `describe_preprocessing()`; the sidecar records it
+  under `models.<name>.preprocessing`.
+
+### Changed
+- **Square-input networks see the whole picture.** `clip`, `aesthetics`,
+  `ebind`, `dinov2` and `places` squash the input to a short-side square
+  before their own transform, instead of centre-cropping it. Square inputs
+  are unchanged; a non-square image or frame changes.
+- **`llstat` runs at the canonical pixel area** (425 x 425 at the picture's
+  aspect ratio, bicubic), like `saliency`: its spectral and edge columns
+  depend on absolute pixel scale. 425 x 425 inputs are unchanged.
+- **Video pixels are squared for every model** (stage 0). Before, only
+  `saliency` corrected a non-square sample aspect ratio; it now runs at
+  `pixel_aspect` 1 on video, since its frames are already square-pixelled.
+
 ## [0.16.0] - 2026-11-07
 
 ### Added
@@ -26,7 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refuses while a flagged file is unreviewed. Tables carry a sha256-pinned
   parameter record; a table edited by hand, or a source missing from it or
   changed since detection, is a loud error. The table's reader for
-  extraction (`--framing-table`) follows in a later release.
+  extraction (`--framing-table`) is in 0.17.0.
 
 ### Changed
 - The video decode loop is now `viz2psy.video.iter_frames`, shared by

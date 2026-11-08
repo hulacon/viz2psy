@@ -145,12 +145,12 @@ class TestCanonicalResize:
 
 
 class TestVideoWiring:
-    def test_only_saliency_gets_the_pixel_aspect(self):
-        from viz2psy.cli import _video_model, _video_preprocessing
+    def test_video_saliency_runs_at_square_pixels(self):
+        # Stage 0 (viz2psy.framing.Stage0) squares the pixels before any model
+        # sees a frame, so saliency must not correct the aspect a second time.
+        from viz2psy.cli import _video_model
 
-        assert _video_model("saliency", "cpu", 8 / 9).pixel_aspect == pytest.approx(8 / 9)
-        assert _video_preprocessing("saliency", 8 / 9)["pixel_aspect"] == pytest.approx(8 / 9)
-        assert _video_preprocessing("llstat", 8 / 9) is None
+        assert _video_model("saliency", "cpu").pixel_aspect == 1.0
 
     def test_sidecar_records_saliency_preprocessing(self):
         from viz2psy.metadata import MetadataBuilder

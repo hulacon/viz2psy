@@ -19,7 +19,7 @@ import torch.nn.functional as F
 from PIL import Image
 from scipy.special import logsumexp
 
-from .base import BaseModel
+from .base import CANONICAL_AREA, BaseModel, canonical_size  # noqa: F401 (re-export)
 
 _DEFAULT_GRID_SIZE = 24
 
@@ -31,22 +31,7 @@ _DEFAULT_GRID_SIZE = 24
 #: at 1920x800, 5 at 1080p). Sub-batching does not change any value.
 _PIXEL_BUDGET = 12_000_000
 
-#: Pixel area every input is resized to before DeepGaze (NSD's 425 x 425).
-CANONICAL_AREA = 425 * 425
-
-
-def canonical_size(width: int, height: int, pixel_aspect: float = 1.0,
-                   area: int | None = CANONICAL_AREA) -> tuple[int, int]:
-    """(width, height) holding ``area`` pixels at the display aspect ratio.
-
-    The display width is ``width * pixel_aspect`` (the stream's sample aspect
-    ratio; 1.0 for square pixels). ``area=None`` keeps the stored pixel count
-    and only corrects the aspect.
-    """
-    display_w = width * pixel_aspect
-    target = width * height if area is None else area
-    scale = (target / (display_w * height)) ** 0.5
-    return max(1, round(display_w * scale)), max(1, round(height * scale))
+# canonical_size and CANONICAL_AREA live in .base (llstat shares them); re-exported here.
 
 
 class SaliencyModel(BaseModel):

@@ -107,12 +107,33 @@ Default: auto-detect (CUDA > MPS > CPU).
 | `--save-frames DIR` | Save viewing copies of the frames to directory (default: beside the output) |
 | `--no-save-frames` | Do not save viewing copies |
 | `--frame-format {jpg,png}` | Format of the viewing copies (default: jpg, quality 85) |
+| `--framing-table CSV` | A finalized framing table (see [Framing Tables](#framing-tables-viz2psy-framing)): crop each frame to its file's bar box before any model sees it |
 
 Models always score the decoded frames, never the saved copies. When frames
 must go to disk (`--parallel` with several models, or when the frames would
 exceed 80 % of available memory), the scoring copies are lossless PNG in a
 temporary directory. The sidecar records this as `input.framing`
 (`frame_source: "raw decode"`, `frame_cache: "memory" | "png"`).
+
+**Stage 0 (every video, every model).** Each decoded frame is cropped to the
+file's bar box from `--framing-table`, then resized to square pixels (the
+cropped width times the stream's sample aspect ratio, bicubic). Without a
+table nothing is cropped and only the pixels are squared. A video missing
+from a given table, changed since detection, or with a different sample
+aspect ratio is an error. `motion` applies the same stage 0 to the frames it
+reads itself. The sidecar's `input.framing` records it: `stage0`,
+`stage0_version`, `stored_wh`, `pixel_aspect`, `crop`, `active_wh`,
+`framing_table`, `framing_table_sha256`, `detect_rule_version`, `box_source`.
+Still images record `frame_source: "still image"` (stage 0 is a no-op).
+
+**Stage 1 (per model, every input).** Each model's input transform is
+recorded in the sidecar under `models.<name>.preprocessing`. Square-input
+networks see the whole picture: `clip`, `aesthetics`, `ebind`, `dinov2` and
+`places` squash it to a short-side square before their own transform, as
+`caption`, `emonet`, `vgg19`, `gist` and `resmem` already did. `saliency`
+and `llstat` work at a canonical pixel area (425 x 425) at the picture's
+aspect ratio. Square stills (e.g. NSD's 425 x 425) are unchanged by all of
+this.
 
 ### HDF5 Options
 

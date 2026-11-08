@@ -226,21 +226,12 @@ def _process_single_model_images(
     return (model_name, all_scores, feature_names, elapsed, device_used)
 
 
-def _video_model(model_name: str, device: str | None, pixel_aspect: float = 1.0):
-    """A model for video frames. A model that declares an input transform
-    (``describe_preprocessing``; saliency) also gets the stream's pixel aspect,
-    so it sees the frame at its display shape. Other models score stored pixels."""
+def _video_model(model_name: str, device: str | None):
+    """A model for video frames. Frames reach it after stage 0 (bars cropped,
+    pixels squared; :class:`viz2psy.framing.Stage0`), so every model, saliency
+    included, runs at square pixels (``pixel_aspect`` 1)."""
     model_cls = _load_model_class(model_name)
-    kwargs = {"device": device} if device else {}
-    if pixel_aspect != 1.0 and hasattr(model_cls, "describe_preprocessing"):
-        kwargs["pixel_aspect"] = pixel_aspect
-    return model_cls(**kwargs)
-
-
-def _video_preprocessing(model_name: str, pixel_aspect: float) -> dict | None:
-    """The sidecar's ``preprocessing`` entry for a model run on video frames."""
-    describe = getattr(_load_model_class(model_name), "describe_preprocessing", None)
-    return describe(pixel_aspect=pixel_aspect) if describe else None
+    return model_cls(device=device) if device else model_cls()
 
 
 def _process_single_model_video(
@@ -249,7 +240,6 @@ def _process_single_model_video(
     batch_size: int,
     device: str | None,
     quiet: bool,
-    pixel_aspect: float = 1.0,
 ) -> tuple[str, list[dict], list[str], float, str]:
     """Worker function to process video frames with a single model.
 
@@ -259,7 +249,7 @@ def _process_single_model_video(
     from tqdm import tqdm
     from viz2psy.utils import load_image
 
-    model = _video_model(model_name, device, pixel_aspect)
+    model = _video_model(model_name, device)
 
     if not quiet:
         print(f"[{model_name}] Loading on {model.device}...")
@@ -538,8 +528,16 @@ def _process_video(
     metadata=None,
     parallel: bool = False,
     frame_format: str = "jpg",
+    framing_table: Path | None = None,
 ):
-    """Process a video file and return a DataFrame with time-based scores."""
+    """Process a video file and return a DataFrame with time-based scores.
+
+    Every frame first goes through the framing rule's stage 0
+    (:func:`viz2psy.framing.stage0_for`): the bar box from ``framing_table``
+    is cropped and the pixels are squared. Without a table nothing is
+    cropped, the pixels are still squared, and the sidecar says so.
+    """
+    from viz2psy.framing import stage0_for
     from viz2psy.pipeline import score_images
     from viz2psy.video import (
         extract_frames,
@@ -550,15 +548,16 @@ def _process_video(
     )
 
     video_info = get_video_info(video_path)
-    pixel_aspect = video_info["pixel_aspect"]
+    stage0 = stage0_for(video_path, framing_table)
     if not quiet:
         print(f"Video: {video_path.name}")
         print(f"  Duration: {video_info['duration']:.1f}s, "
               f"Resolution: {video_info['width']}x{video_info['height']}, "
               f"FPS: {video_info['fps']:.1f}")
-        if video_info["pixel_aspect"] != 1.0:
-            print(f"  Pixel aspect: {video_info['pixel_aspect']:.4f} "
-                  "(saliency resizes to the display aspect; other models score stored pixels)")
+        c = stage0.crop
+        print(f"  Stage 0: {'framing table' if framing_table else 'no framing table'}; "
+              f"crop L{c['left']} R{c['right']} T{c['top']} B{c['bottom']}, "
+              f"pixel aspect {stage0.sar:.4f} -> picture {stage0.active_wh[0]}x{stage0.active_wh[1]}")
 
     # Check memory usage
     estimated_mem = estimate_memory_usage(video_info, frame_interval)
@@ -589,22 +588,24 @@ def _process_video(
     if metadata:
         metadata.set_input_video(video_path, frame_interval, n_frames, save_frames,
                                  frame_format=frame_format,
-                                 frame_cache="png" if to_disk else "memory")
+                                 frame_cache="png" if to_disk else "memory",
+                                 stage0=stage0.record())
 
     temp_dir = None
     if to_disk and save_frames and frame_format == "png":
         # The viewing copies are already lossless: score from them.
         frames = extract_frames(video_path, frame_interval=frame_interval,
-                                save_dir=save_frames, quiet=quiet, frame_format="png")
+                                save_dir=save_frames, quiet=quiet, frame_format="png",
+                                stage0=stage0)
     elif to_disk:
         frames, temp_dir = extract_frames_to_temp(
             video_path, frame_interval=frame_interval, quiet=quiet,
-            view_dir=save_frames, view_format=frame_format,
+            view_dir=save_frames, view_format=frame_format, stage0=stage0,
         )
     else:
         frames = extract_frames(video_path, frame_interval=frame_interval,
                                 quiet=quiet, view_dir=save_frames,
-                                view_format=frame_format)
+                                view_format=frame_format, stage0=stage0)
 
     try:
         # Extract times and images/paths
@@ -629,7 +630,7 @@ def _process_video(
                 raise ModelLoadError(model_name, str(e)) from e
             t0 = _time.time()
             try:
-                scores = model.predict_video(video_path, times, quiet=quiet)
+                scores = model.predict_video(video_path, times, quiet=quiet, stage0=stage0)
             except Exception as e:
                 raise InferenceError(model_name, str(e)) from e
             video_results[model_name] = (scores, _time.time() - t0)
@@ -665,7 +666,6 @@ def _process_video(
                         batch_size,
                         device,
                         quiet,
-                        pixel_aspect,
                     )
                     futures[future] = model_name
 
@@ -694,8 +694,7 @@ def _process_video(
                     result_df[col] = scores_df[col]
 
                 if metadata:
-                    metadata.add_model(model_name, feature_names, elapsed,
-                                       preprocessing=_video_preprocessing(model_name, pixel_aspect))
+                    metadata.add_model(model_name, feature_names, elapsed)
 
             return _merge_video_results(result_df)
 
@@ -713,7 +712,7 @@ def _process_video(
         result_df = pd.DataFrame({"time": times})
 
         for model_name in models:
-            model = _video_model(model_name, device, pixel_aspect)
+            model = _video_model(model_name, device)
 
             if not quiet:
                 print(f"Loading {model.name} model on {model.device} ...")
@@ -752,8 +751,7 @@ def _process_video(
 
             # Record model metadata
             if metadata:
-                metadata.add_model(model_name, feature_names, elapsed,
-                                   preprocessing=_video_preprocessing(model_name, pixel_aspect))
+                metadata.add_model(model_name, feature_names, elapsed)
 
         return _merge_video_results(result_df)
 
@@ -1039,6 +1037,15 @@ def main():
         help="Image format for saved video frames (default: jpg). JPEG is ~7x smaller than PNG. "
              "Viewing copies only: models always score the decoded frames.",
     )
+    parser.add_argument(
+        "--framing-table",
+        type=Path,
+        default=None,
+        help="A reviewed framing table (`viz2psy framing finalize`). Each video frame is cropped "
+             "to the table's bar box and resized to square pixels before any model sees it; a "
+             "video missing from the table is an error. Without it, pixels are still squared "
+             "and nothing is cropped (recorded in the sidecar's input.framing).",
+    )
     # HDF5-specific options
     parser.add_argument(
         "--dataset", "-d",
@@ -1140,6 +1147,8 @@ def main():
                 print("Warning: --save-frames is only used with video input.", file=sys.stderr)
             if args.frame_interval != 0.5:
                 print("Warning: --frame-interval is only used with video input.", file=sys.stderr)
+            if args.framing_table:
+                print("Warning: --framing-table is only used with video input.", file=sys.stderr)
 
             hdf5_path = inputs[0]
             if not hdf5_path.exists():
@@ -1208,6 +1217,7 @@ def main():
                 metadata=metadata,
                 parallel=args.parallel,
                 frame_format=args.frame_format,
+                framing_table=args.framing_table,
             )
         else:
             # Image processing
@@ -1217,6 +1227,8 @@ def main():
                 print("Warning: --frame-format is only used with video input.", file=sys.stderr)
             if args.frame_interval != 0.5:
                 print("Warning: --frame-interval is only used with video input.", file=sys.stderr)
+            if args.framing_table:
+                print("Warning: --framing-table is only used with video input.", file=sys.stderr)
             if args.dataset:
                 print("Warning: --dataset is only used with HDF5 input.", file=sys.stderr)
             if args.start != 0 or args.end is not None:

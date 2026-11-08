@@ -9,6 +9,43 @@ from PIL import Image
 from viz2psy.exceptions import DeviceError
 
 
+#: Pixel area a model works at when its output depends on absolute pixel
+#: scale (saliency, llstat): NSD's 425 x 425, so NSD stills are unchanged.
+CANONICAL_AREA = 425 * 425
+
+#: The ``preprocessing`` record of a square-input network that squashes.
+SQUASH_RECORD = {
+    "square": "squash to a short-side square (the whole picture; aspect not kept)",
+    "interpolation": "bicubic",
+}
+
+
+def canonical_size(width: int, height: int, pixel_aspect: float = 1.0,
+                   area: int | None = CANONICAL_AREA) -> tuple[int, int]:
+    """(width, height) holding ``area`` pixels at the display aspect ratio.
+
+    The display width is ``width * pixel_aspect`` (the stream's sample aspect
+    ratio; 1.0 for square pixels). ``area=None`` keeps the stored pixel count
+    and only corrects the aspect.
+    """
+    display_w = width * pixel_aspect
+    target = width * height if area is None else area
+    scale = (target / (display_w * height)) ** 0.5
+    return max(1, round(display_w * scale)), max(1, round(height * scale))
+
+
+def squash_to_square(image: Image.Image) -> Image.Image:
+    """The whole picture resized to a short-side square (bicubic).
+
+    The framing rule's stage 1 for square-input networks (psytwill-space
+    framing D2 = squash): on a wide frame a centre crop would show the network
+    only the middle of the picture, so every square-input network sees all of
+    it instead, distorted rather than cut. A square input is returned as is.
+    """
+    s = min(image.size)
+    return image if image.size == (s, s) else image.resize((s, s), Image.BICUBIC)
+
+
 def _get_default_device() -> torch.device:
     """Auto-detect the best available device."""
     if torch.cuda.is_available():

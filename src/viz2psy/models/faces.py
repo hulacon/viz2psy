@@ -84,6 +84,11 @@ class FacesModel(BaseModel):
         super().__init__(device=device)  # detector is CPU; kept for interface parity
         self.weights_path = Path(weights_path) if weights_path else _DEFAULT_WEIGHTS_PATH
 
+    @staticmethod
+    def describe_preprocessing() -> dict:
+        """The input transform, as recorded in the sidecar."""
+        return {'resize': "none: YuNet runs at the picture's own pixel size"}
+
     def load(self) -> None:
         import cv2
 

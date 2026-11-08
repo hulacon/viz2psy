@@ -10,7 +10,7 @@ import torch
 import torchvision.transforms as T
 from PIL import Image
 
-from .base import BaseModel
+from .base import SQUASH_RECORD, BaseModel, squash_to_square
 
 _DEFAULT_MODEL_NAME = "dinov2_vitb14"
 _EMBED_DIMS = {
@@ -51,6 +51,11 @@ class DINOv2Model(BaseModel):
                         std=[0.229, 0.224, 0.225]),
         ])
 
+    @staticmethod
+    def describe_preprocessing() -> dict:
+        """The input transform, as recorded in the sidecar (framing D2: squash)."""
+        return {**SQUASH_RECORD, "then": 'resize short side to 256, centre crop 224 (the published ImageNet recipe: keeps the central 87.5 % of each axis)'}
+
     def load(self) -> None:
         self.model = torch.hub.load(
             "facebookresearch/dinov2", self.model_name, trust_repo=True,
@@ -59,14 +64,14 @@ class DINOv2Model(BaseModel):
         self.model = self.model.to(self.device)
 
     def predict(self, image: Image.Image) -> dict[str, float]:
-        x = self._transform(image.convert("RGB")).unsqueeze(0).to(self.device)
+        x = self._transform(squash_to_square(image.convert("RGB"))).unsqueeze(0).to(self.device)
         with torch.no_grad():
             emb = self.model(x)
         values = emb.squeeze(0).cpu().tolist()
         return {f"dinov2_{i:03d}": v for i, v in enumerate(values)}
 
     def predict_batch(self, images: list[Image.Image]) -> list[dict[str, float]]:
-        tensors = [self._transform(img.convert("RGB")) for img in images]
+        tensors = [self._transform(squash_to_square(img.convert("RGB"))) for img in images]
         batch = torch.stack(tensors).to(self.device)
         with torch.no_grad():
             embs = self.model(batch)

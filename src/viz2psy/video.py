@@ -212,6 +212,7 @@ def extract_frames(
     frame_format: str = "jpg",
     view_dir: Path | None = None,
     view_format: str = "jpg",
+    stage0=None,
 ) -> list[tuple[float, Image.Image | Path]]:
     """Extract frames from a video at specified time intervals.
 
@@ -236,6 +237,10 @@ def extract_frames(
         unaffected by their format.
     view_format : str
         ``"jpg"`` (default) or ``"png"``, for ``view_dir``.
+    stage0 : viz2psy.framing.Stage0, optional
+        The framing rule's stage 0 (bar crop + square pixels), applied to
+        every decoded frame before anything else sees it: the returned frames,
+        the viewing copies and the blank/frozen checks.
 
     Returns
     -------
@@ -267,6 +272,8 @@ def extract_frames(
     n_blank = n_frozen = 0
     previous = None
     for t, frame_rgb in iter_frames(video_path, frame_interval, quiet=quiet):
+        if stage0 is not None:
+            frame_rgb = stage0.apply(frame_rgb)
         n_blank += int(frame_rgb.min() == frame_rgb.max())
         n_frozen += int(previous is not None and np.array_equal(frame_rgb, previous))
         previous = frame_rgb
@@ -357,6 +364,7 @@ def extract_frames_to_temp(
     quiet: bool = False,
     view_dir: Path | None = None,
     view_format: str = "jpg",
+    stage0=None,
 ) -> tuple[list[tuple[float, Path]], tempfile.TemporaryDirectory]:
     """Extract frames to a temporary directory as lossless PNG, for scoring.
 
@@ -372,8 +380,8 @@ def extract_frames_to_temp(
         Time between frames in seconds.
     quiet : bool
         Suppress progress output.
-    view_dir, view_format
-        Optional viewing copies, as in ``extract_frames``.
+    view_dir, view_format, stage0
+        As in ``extract_frames``.
 
     Returns
     -------
@@ -390,5 +398,6 @@ def extract_frames_to_temp(
         frame_format="png",
         view_dir=view_dir,
         view_format=view_format,
+        stage0=stage0,
     )
     return frames, temp_dir

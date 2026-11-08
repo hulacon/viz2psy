@@ -85,6 +85,11 @@ class YOLOModel(BaseModel):
         self.conf = conf
         self.iou = iou
 
+    @staticmethod
+    def describe_preprocessing() -> dict:
+        """The input transform, as recorded in the sidecar."""
+        return {'resize': 'ultralytics letterbox: long side 640 px, aspect kept, padded'}
+
     def load(self) -> None:
         from ultralytics import YOLO
 

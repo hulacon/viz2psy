@@ -12,7 +12,7 @@ import torch.nn as nn
 import open_clip
 from PIL import Image
 
-from .base import BaseModel
+from .base import SQUASH_RECORD, BaseModel, squash_to_square
 
 _CLIP_MODEL = "ViT-L-14"
 _CLIP_PRETRAINED = "openai"
@@ -76,6 +76,11 @@ class AestheticsModel(BaseModel):
         self._preprocess = None
         self._head = None
 
+    @staticmethod
+    def describe_preprocessing() -> dict:
+        """The input transform, as recorded in the sidecar (framing D2: squash)."""
+        return {**SQUASH_RECORD, "then": "the model's own transform: resize to its input size, then centre crop (removes nothing on a square); CLIP ViT-L/14 embedding into the LAION aesthetic head"}
+
     def load(self) -> None:
         # Load CLIP backbone.
         clip_model, _, preprocess = open_clip.create_model_and_transforms(
@@ -103,14 +108,14 @@ class AestheticsModel(BaseModel):
         return features.float()
 
     def predict(self, image: Image.Image) -> dict[str, float]:
-        x = self._preprocess(image.convert("RGB")).unsqueeze(0).to(self.device)
+        x = self._preprocess(squash_to_square(image.convert("RGB"))).unsqueeze(0).to(self.device)
         emb = self._embed(x)
         with torch.no_grad():
             score = self._head(emb).item()
         return {"aesthetics_score": score}
 
     def predict_batch(self, images: list[Image.Image]) -> list[dict[str, float]]:
-        tensors = [self._preprocess(img.convert("RGB")) for img in images]
+        tensors = [self._preprocess(squash_to_square(img.convert("RGB"))) for img in images]
         batch = torch.stack(tensors).to(self.device)
         emb = self._embed(batch)
         with torch.no_grad():

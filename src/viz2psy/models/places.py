@@ -19,7 +19,7 @@ from PIL import Image
 
 from viz2psy.exceptions import ModelLoadError
 
-from .base import BaseModel
+from .base import SQUASH_RECORD, BaseModel, squash_to_square
 
 # URLs for model weights and label files hosted by MIT CSAIL.
 _WEIGHTS_URL = "http://places2.csail.mit.edu/models_places365/wideresnet18_places365.pth.tar"
@@ -209,6 +209,11 @@ class PlacesModel(BaseModel):
         with urlopen(url) as resp:
             return np.load(io.BytesIO(resp.read()))
 
+    @staticmethod
+    def describe_preprocessing() -> dict:
+        """The input transform, as recorded in the sidecar (framing D2: squash)."""
+        return {**SQUASH_RECORD, "then": 'resize short side to 256, centre crop 224 (the published ImageNet recipe: keeps the central 87.5 % of each axis)'}
+
     def load(self) -> None:
         # Load model weights.
         model = _wideresnet18(num_classes=365)
@@ -266,13 +271,13 @@ class PlacesModel(BaseModel):
         return results
 
     def predict(self, image: Image.Image) -> dict[str, float]:
-        x = self._transform(image.convert("RGB")).unsqueeze(0).to(self.device)
+        x = self._transform(squash_to_square(image.convert("RGB"))).unsqueeze(0).to(self.device)
         with torch.no_grad():
             logits, features = self._forward_with_features(x)
         return self._score(logits, features)[0]
 
     def predict_batch(self, images: list[Image.Image]) -> list[dict[str, float]]:
-        tensors = [self._transform(img.convert("RGB")) for img in images]
+        tensors = [self._transform(squash_to_square(img.convert("RGB"))) for img in images]
         batch = torch.stack(tensors).to(self.device)
         with torch.no_grad():
             logits, features = self._forward_with_features(batch)
