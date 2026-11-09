@@ -12,6 +12,7 @@ def __getattr__(name):
         "CLIPModel": ".clip",
         "EBindModel": ".ebind",
         "CaptionModel": ".caption",
+        "CaptionVLMModel": ".caption_vlm",
         "GISTModel": ".gist",
         "LLStatModel": ".llstat",
         "SaliencyModel": ".saliency",

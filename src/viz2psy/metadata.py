@@ -37,6 +37,7 @@ def get_model_version(model_name: str) -> str:
         "clip": ("open_clip_torch", None),
         "ebind": ("ebind", None),
         "caption": ("transformers", None),
+        "caption_vlm": ("transformers", None),  # checkpoint pins the Hub revision
         "gist": (None, "1.0"),  # Custom implementation
         "llstat": (None, "1.0"),  # Custom implementation
         "saliency": ("deepgaze_pytorch", None),
@@ -156,7 +157,7 @@ def get_feature_info(model_name: str, feature_names: list[str]) -> dict[str, Any
             "count": count
         }
 
-    if model_name == "caption":
+    if model_name in ("caption", "caption_vlm"):
         return {
             "columns": feature_names,
             "count": count,
