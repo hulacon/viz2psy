@@ -55,6 +55,7 @@ MODEL_REGISTRY = {
     "clip": ("viz2psy.models.clip", "CLIPModel", "512-dim CLIP ViT-B-32 embeddings"),
     "ebind": ("viz2psy.models.ebind", "EBindModel", "1024-dim EBind image embeddings (shared space with word2psy/aud2psy)"),
     "caption": ("viz2psy.models.caption", "CaptionModel", "Natural language image captions (BLIP)"),
+    "caption_vlm": ("viz2psy.models.caption_vlm", "CaptionVLMModel", "One-sentence frame captions from a prompted VLM (Qwen3-VL-8B-Instruct)"),
     "gist": ("viz2psy.models.gist", "GISTModel", "512-dim Gabor spatial envelope features"),
     "llstat": ("viz2psy.models.llstat", "LLStatModel", "17 low-level image statistics"),
     "saliency": ("viz2psy.models.saliency", "SaliencyModel", "576-dim fixation density grid"),

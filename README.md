@@ -4,7 +4,7 @@ This is a toolbox meant to enable bulk calculation and exploration of psychologi
 
 ## Features
 
-- **12 pre-integrated models** covering memorability, emotion, semantics, captioning, saliency, cross-modal embeddings, and more
+- **17 pre-integrated models** covering memorability, emotion, semantics, captioning, saliency, cross-modal embeddings, and more
 - **Unified CLI** for images, videos, and HDF5 image bricks
 - **Interactive visualizations** with Plotly-based dashboards
 - **Metadata sidecar files** documenting outputs and feature definitions
@@ -88,6 +88,7 @@ df = score_images(model, ["photo1.jpg", "photo2.jpg"])
 | `clip` | 512 dims | Vision-language embeddings (OpenCLIP) |
 | `ebind` | 1024 dims | Cross-modal EBind embeddings, shared space with text and audio (see below) |
 | `caption` | 1 caption | Natural language image captions (BLIP) |
+| `caption_vlm` | 1 caption | One-sentence frame descriptions from a prompted vision-language model (Qwen3-VL-8B-Instruct; pinned revision, versioned prompt; needs a GPU with ~22 GB and transformers >= 4.57) |
 | `dinov2` | 768 dims | Self-supervised features |
 | `gist` | 512 dims | Spatial envelope |
 | `places` | 467 scores | Scene categories + attributes |
@@ -141,6 +142,7 @@ models you used:
 - **CLIP** (`clip`, architecture): Radford, A., et al. (2021). Learning transferable visual models from natural language supervision. *ICML 2021*. [arXiv:2103.00020](https://arxiv.org/abs/2103.00020)
 - **OpenCLIP / LAION-2B** (`clip`, the actual weights, `laion2b_s34b_b79k`): Cherti, M., et al. (2023). Reproducible scaling laws for contrastive language-image learning. *CVPR 2023*. [arXiv:2212.07143](https://arxiv.org/abs/2212.07143); Ilharco, G., et al. (2021). OpenCLIP. [doi:10.5281/zenodo.5143773](https://doi.org/10.5281/zenodo.5143773)
 - **EBind** (`ebind`): Broadbent, J., Cohen, F., Hvilshøj, F., Landau, E., & Sasoglu, E. (2025). EBind: A practical approach to space binding. [arXiv:2511.14229](https://arxiv.org/abs/2511.14229). Vision arm is the Perception Encoder: Bolya, D., et al. (2025). Perception Encoder: The best visual embeddings are not at the output of the network. *NeurIPS 2025*. [arXiv:2504.13181](https://arxiv.org/abs/2504.13181)
+- **Qwen3-VL** (`caption_vlm`): the model card ([Qwen/Qwen3-VL-8B-Instruct](https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct)) cites Qwen Team (2025), Qwen3 technical report, [arXiv:2505.09388](https://arxiv.org/abs/2505.09388), and Bai, S., et al. (2025), Qwen2.5-VL technical report, [arXiv:2502.13923](https://arxiv.org/abs/2502.13923)
 - **BLIP** (`caption`): Li, J., Li, D., Xiong, C., & Hoi, S. (2022). BLIP: Bootstrapping language-image pre-training for unified vision-language understanding and generation. *ICML 2022*. [arXiv:2201.12086](https://arxiv.org/abs/2201.12086)
 - **DINOv2** (`dinov2`): Oquab, M., et al. (2024). DINOv2: Learning robust visual features without supervision. *TMLR*. [arXiv:2304.07193](https://arxiv.org/abs/2304.07193)
 - **GIST** (`gist`): Oliva, A., & Torralba, A. (2001). Modeling the shape of the scene: A holistic representation of the spatial envelope. *International Journal of Computer Vision, 42*, 145–175. [doi:10.1023/A:1011139631724](https://doi.org/10.1023/A:1011139631724)

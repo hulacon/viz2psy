@@ -69,6 +69,7 @@ INVENTORY = {
     "clip": lambda: _numbered("clip", 512),
     "ebind": lambda: _numbered("ebind", 1024, width=4),
     "caption": lambda: ["caption_text"],
+    "caption_vlm": lambda: ["caption_vlm_text"],
     "gist": lambda: _numbered("gist", 512),
     "llstat": _llstat_columns,
     "saliency": lambda: [f"saliency_{x:02d}_{y:02d}" for y in range(24) for x in range(24)],

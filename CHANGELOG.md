@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-11-09
+
+### Added
+- `caption_vlm`: one-sentence frame captions (`caption_vlm_text`, string) from
+  `Qwen/Qwen3-VL-8B-Instruct` at a pinned Hub revision (`checkpoint` =
+  `<repo>@<revision>`), with a frozen, versioned prompt (`caption-prompt v1`),
+  greedy decoding (<= 64 new tokens, bfloat16) and inputs shrunk to <= 768 px
+  on the long side, aspect kept. The sidecar's `preprocessing` record carries
+  the prompt, its version and the decoding. `caption` (BLIP) is unchanged.
+  Needs transformers >= 4.57; an older version is a load error naming the fix.
+
 ## [0.17.0] - 2026-11-08
 
 ### Added

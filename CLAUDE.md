@@ -24,6 +24,7 @@ viz2psy/
         │   ├── base.py    # Abstract base class
         │   ├── aesthetics.py
         │   ├── caption.py # BLIP image captioning
+        │   ├── caption_vlm.py # Qwen3-VL frame captions (frozen prompt)
         │   ├── clip.py
         │   ├── dinov2.py
         │   ├── emonet.py
