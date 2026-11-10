@@ -20,9 +20,11 @@ function of its prompt as much as of its weights:
   captioner sees the active picture whole, like every other model;
 - **decoding**: greedy, at most ``MAX_NEW_TOKENS`` new tokens, bfloat16.
 
-Batched generation pads on the left; in bfloat16 a frame's caption can differ
-in rare tokens with the batch it shares, so runs to be compared should use
-the same ``--batch-size``.
+Batched generation pads on the left. In bfloat16 a frame's caption can differ
+with the batch it shares and with the GPU type (one flipped token rewrites the
+rest of the sentence; about 12 % of frames reword between two H100s, about
+34 % between an A100 and an H100), so runs to be compared should use the same
+``--batch-size`` and one GPU type (the sidecar's optional ``device_name``).
 """
 
 from __future__ import annotations

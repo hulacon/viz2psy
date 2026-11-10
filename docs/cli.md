@@ -251,6 +251,7 @@ When saving to file, a `.meta.json` sidecar is created with:
     "columns": 533
   },
   "device": "cuda",
+  "device_name": "NVIDIA H100 80GB HBM3",
   "total_runtime_sec": 45.2,
   "models": {
     "resmem": {
@@ -264,6 +265,12 @@ When saving to file, a `.meta.json` sidecar is created with:
   }
 }
 ```
+
+`device_name` is optional: the GPU model behind a `cuda` device, written when
+it can be read and left out otherwise (CPU, MPS, or a name the driver will not
+report). It matters for models whose output depends on the GPU's arithmetic:
+`caption_vlm`'s greedy bfloat16 captions reword some frames between GPU types,
+so compare or pool such outputs within one `device_name`.
 
 This sidecar is used by `viz2psy-viz` for:
 - Path resolution (finding source images/video)
