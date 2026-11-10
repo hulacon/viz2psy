@@ -879,9 +879,8 @@ def _process_video_set(
     result_df = pd.DataFrame({
         "stimulus_id": [sid for sid, ts in zip(stimulus_ids, times_by_video) for _ in ts],
         "time": [t for ts in times_by_video for t in ts],
+        **columns,
     })
-    for col, values in columns.items():
-        result_df[col] = values
 
     if metadata:
         videos = []
