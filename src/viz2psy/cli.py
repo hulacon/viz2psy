@@ -24,6 +24,10 @@ Examples
     # Save extracted frames to disk (for large videos)
     viz2psy resmem movie.mp4 --save-frames ./frames -o scores.csv
 
+    # Several short videos in one call (model loaded once; rows keyed
+    # stimulus_id + time; one sidecar with input.type "video_set")
+    viz2psy resmem clips/*.mp4 --id-pattern 'ext-corpus-{stem}' -o scores.csv
+
     # Score HDF5 image brick (e.g., NSD dataset)
     viz2psy resmem data.hdf5 -o scores.csv
 
@@ -762,6 +766,137 @@ def _process_video(
             temp_dir.cleanup()
 
 
+
+def _process_video_set(
+    video_paths: list[Path],
+    stimulus_ids: list[str],
+    models: list[str],
+    frame_interval: float,
+    batch_size: int,
+    device: str | None,
+    quiet: bool,
+    metadata=None,
+    framing_table: Path | None = None,
+):
+    """Score several videos in one call: each model is loaded once and run
+    over every video in turn, so short clips do not pay a model load each.
+
+    Each video goes through stage 0 exactly as :func:`_process_video` does
+    (frames decoded, cropped to the table's box, pixels squared; lossless PNG
+    only under memory pressure). Every video must be scored under one framing
+    rule. Returns one frame with rows keyed (``stimulus_id``, ``time``), in
+    input order. No viewing copies are written.
+    """
+    import time as _time
+
+    import pandas as pd
+    from tqdm import tqdm
+
+    from viz2psy.framing import RULE_RECORD_KEYS, stage0_for
+    from viz2psy.video import (
+        estimate_memory_usage,
+        extract_frames,
+        extract_frames_to_temp,
+        get_available_memory,
+        get_video_info,
+    )
+    from viz2psy.utils import load_image
+
+    # Stage 0 for every video first, so a video missing from the table fails
+    # before any model loads.
+    stage0s = [stage0_for(p, framing_table) for p in video_paths]
+    rules = {tuple(s.record()[k] for k in RULE_RECORD_KEYS) for s in stage0s}
+    if len(rules) != 1:
+        raise VideoError(f"{len(video_paths)} videos", "the videos do not share one framing rule")
+    available = get_available_memory()
+    to_disk = [estimate_memory_usage(get_video_info(p), frame_interval) > available * 0.8
+               for p in video_paths]
+    if not quiet:
+        print(f"Video set: {len(video_paths)} videos, frames every {frame_interval}s, "
+              f"{'framing table' if framing_table else 'no framing table'}")
+
+    def decode(i):
+        """(times, images) for video i after stage 0, and a temp dir to clean up."""
+        if to_disk[i]:
+            frames, tmp = extract_frames_to_temp(video_paths[i], frame_interval=frame_interval,
+                                                 quiet=True, stage0=stage0s[i])
+            return [t for t, _ in frames], [load_image(f) for _, f in frames], tmp
+        frames = extract_frames(video_paths[i], frame_interval=frame_interval, quiet=True,
+                                stage0=stage0s[i])
+        return [t for t, _ in frames], [f for _, f in frames], None
+
+    times_by_video: list[list[float] | None] = [None] * len(video_paths)
+    columns: dict[str, list] = {}
+    for model_name in models:
+        video_only = model_name in VIDEO_ONLY_MODELS
+        if video_only:
+            model_cls = _load_model_class(model_name)
+            model = model_cls(device=device) if device else model_cls()
+        else:
+            model = _video_model(model_name, device)
+        if not quiet:
+            print(f"Loading {model.name} model on {model.device} ...")
+        try:
+            model.load()
+        except Exception as e:
+            raise ModelLoadError(model_name, str(e)) from e
+        if metadata and metadata.device is None:
+            metadata.set_device(str(model.device))
+
+        t0 = _time.time()
+        scores: list[dict] = []
+        iterator = range(len(video_paths))
+        if not quiet:
+            iterator = tqdm(iterator, desc=model.name, unit="video")
+        for i in iterator:
+            times, images, tmp = decode(i)
+            try:
+                if times_by_video[i] is None:
+                    times_by_video[i] = times
+                elif times != times_by_video[i]:
+                    raise VideoError(str(video_paths[i]),
+                                     "decoded a different frame grid on a second pass")
+                try:
+                    if video_only:
+                        scores.extend(model.predict_video(video_paths[i], times, quiet=True,
+                                                          stage0=stage0s[i]))
+                    else:
+                        for b in range(0, len(images), batch_size):
+                            scores.extend(model.predict_batch(images[b:b + batch_size]))
+                except Exception as e:
+                    raise InferenceError(model_name, f"{video_paths[i]}: {e}") from e
+            finally:
+                if tmp is not None:
+                    tmp.cleanup()
+        elapsed = _time.time() - t0
+
+        scores_df = pd.DataFrame(scores)
+        for col in scores_df.columns:
+            columns[col] = scores_df[col].tolist()
+        if metadata:
+            metadata.add_model(model_name, list(scores_df.columns), elapsed)
+
+    result_df = pd.DataFrame({
+        "stimulus_id": [sid for sid, ts in zip(stimulus_ids, times_by_video) for _ in ts],
+        "time": [t for ts in times_by_video for t in ts],
+        **columns,
+    })
+
+    if metadata:
+        videos = []
+        for path, sid, s0, ts, disk in zip(video_paths, stimulus_ids, stage0s,
+                                           times_by_video, to_disk):
+            rec = s0.record()
+            videos.append({"path": str(Path(path).resolve()), "stimulus_id": sid,
+                           "n_frames": len(ts), "frame_cache": "png" if disk else "memory",
+                           **{k: v for k, v in rec.items() if k not in RULE_RECORD_KEYS}})
+        rule = stage0s[0].record()
+        metadata.set_input_video_set(
+            videos, frame_interval,
+            {"frame_source": "raw decode", **{k: rule[k] for k in RULE_RECORD_KEYS}})
+    return result_df
+
+
 def _process_images(
     image_paths: list[Path],
     models: list[str],
@@ -999,7 +1134,9 @@ def main():
             "Per-row stimulus_id for HDF5 bricks, as a format string over the "
             "brick index: {idx} is the 0-based image_idx, {idx1} the 1-based "
             "one (e.g. 'ext-nsd-{idx1:06d}'). Overrides --stimulus-id for "
-            "HDF5 input; ignored for images and video."
+            "HDF5 input. For several videos in one call, a format string over "
+            "each file's {stem} (e.g. 'ext-corpus-{stem}'; default: the stem). "
+            "Ignored for images and a single video."
         ),
     )
     parser.add_argument(
@@ -1220,6 +1357,58 @@ def main():
                 frame_format=args.frame_format,
                 framing_table=args.framing_table,
             )
+        elif len(inputs) > 1 and any(is_video_file(p) for p in inputs):
+            # Several videos in one call: each model loaded once for all of them
+            not_video = [str(p) for p in inputs if not is_video_file(p)]
+            if not_video:
+                print(f"Error: a call takes several videos or several images, not both; "
+                      f"not a video: {', '.join(not_video[:3])}", file=sys.stderr)
+                sys.exit(1)
+            if args.save_frames:
+                print("Error: --save-frames is not supported for several videos in one call; "
+                      "score one video per call to keep viewing copies.", file=sys.stderr)
+                sys.exit(1)
+            if args.parallel:
+                print("Error: --parallel is not supported for several videos in one call.",
+                      file=sys.stderr)
+                sys.exit(1)
+            if args.stimulus_id is not None:
+                print("Error: --stimulus-id gives every row one id; for several videos use "
+                      "--id-pattern (e.g. 'ext-corpus-{stem}').", file=sys.stderr)
+                sys.exit(1)
+            for flag, used in (("--dataset", args.dataset),
+                               ("--start/--end", args.start != 0 or args.end is not None)):
+                if used:
+                    print(f"Warning: {flag} is only used with HDF5 input.", file=sys.stderr)
+            missing = [str(p) for p in inputs if not p.exists()]
+            if missing:
+                print(f"Error: File not found: {', '.join(missing[:3])}", file=sys.stderr)
+                sys.exit(1)
+
+            pattern = args.id_pattern or "{stem}"
+            try:
+                stimulus_ids = [pattern.format(stem=p.stem) for p in inputs]
+            except (KeyError, IndexError) as e:
+                print(f"Error: --id-pattern for videos takes {{stem}} only ({e}).", file=sys.stderr)
+                sys.exit(1)
+            dupes = sorted({s for s in stimulus_ids if stimulus_ids.count(s) > 1})
+            if dupes:
+                print(f"Error: two videos would share a stimulus_id: {', '.join(dupes[:3])}",
+                      file=sys.stderr)
+                sys.exit(1)
+
+            input_type = "video_set"
+            result_df = _process_video_set(
+                video_paths=inputs,
+                stimulus_ids=stimulus_ids,
+                models=models,
+                frame_interval=args.frame_interval,
+                batch_size=args.batch_size,
+                device=args.device,
+                quiet=args.quiet,
+                metadata=metadata,
+                framing_table=args.framing_table,
+            )
         else:
             # Image processing
             if args.save_frames or args.no_save_frames:
@@ -1282,7 +1471,10 @@ def main():
                 print(f"Metadata saved to {meta_path}")
 
             # Generate visualizations (unless --no-viz)
-            if not args.no_viz:
+            if not args.no_viz and input_type == "video_set":
+                if not args.quiet:
+                    print("Note: no dashboard for several videos in one call.")
+            elif not args.no_viz:
                 if not args.quiet:
                     print()
                 _generate_visualizations(

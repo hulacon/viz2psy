@@ -43,6 +43,10 @@ viz2psy resmem clip emonet images/*.jpg -o scores.csv
 # Score video frames
 viz2psy resmem movie.mp4 --frame-interval 1.0 -o scores.csv
 
+# Score many short videos in one call (each model loads once; rows keyed
+# stimulus_id + time; one sidecar, input.type "video_set")
+viz2psy resmem clips/*.mp4 --id-pattern 'ext-corpus-{stem}' -o scores.csv
+
 # Visualize results
 viz2psy-viz image scores.csv --browse --image-root ./images -o viewer.html
 ```
