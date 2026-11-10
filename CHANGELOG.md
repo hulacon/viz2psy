@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.1] - 2026-11-10
+
+### Fixed
+- `yolo` no longer drops `yolov8n.pt` into the working directory. Given a
+  bare weights name it cannot find, ultralytics downloads it into the cwd
+  (its own `weights_dir` setting defaults to the relative `weights`), so every
+  directory a job ran from collected a copy. A bare name now resolves under
+  `<torch hub dir>/ultralytics/` (follows `TORCH_HOME`, like the other
+  torch-based models). If the file is missing it is downloaded there once,
+  through a private temporary directory and an atomic rename, so concurrent
+  array tasks sharing the cache never read a partly written file. An explicit
+  path is used as given, and a bare name already present in the cwd is still
+  honoured. Features and the recorded `checkpoint` (`yolov8n.pt`) are
+  unchanged.
+
 ## [0.20.0] - 2026-11-10
 
 ### Added

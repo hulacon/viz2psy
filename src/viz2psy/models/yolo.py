@@ -5,6 +5,10 @@ counts across the 80 COCO object categories, plus aggregate summary
 features like total object count, category count, and object coverage.
 """
 
+import os
+import tempfile
+from pathlib import Path
+
 import numpy as np
 from PIL import Image
 
@@ -30,6 +34,48 @@ _COCO_NAMES = [
     "refrigerator", "book", "clock", "vase", "scissors", "teddy_bear",
     "hair_drier", "toothbrush",
 ]
+
+
+def _weights_dir() -> Path:
+    """Where bare-named YOLO weights live: ``<torch hub dir>/ultralytics``.
+
+    Follows ``TORCH_HOME`` (``~/.cache/torch/hub`` by default), the cache the
+    other torch-based models already use. Ultralytics' own ``weights_dir``
+    setting defaults to the relative path ``weights``, so it cannot serve.
+    """
+    import torch
+
+    return Path(torch.hub.get_dir()) / "ultralytics"
+
+
+def resolve_weights(model_name: str) -> str:
+    """The weights file ``YOLO()`` should open, never a download into the cwd.
+
+    * a path with a directory part (or absolute) is used as given;
+    * a bare file name present in the working directory is used as before;
+    * any other bare name resolves under :func:`_weights_dir`, downloaded
+      there once if missing. The download lands in a private temporary
+      directory beside the target and is renamed into place, so concurrent
+      jobs sharing the cache never read a partly written file.
+
+    Ultralytics, given a bare name it cannot find, downloads it into the
+    current directory, which leaves a weights file in every directory a job
+    runs from.
+    """
+    p = Path(model_name)
+    if p.is_absolute() or p.parent != Path(".") or p.exists():
+        return model_name
+    target = _weights_dir() / p.name
+    if not target.exists():
+        from ultralytics.utils.downloads import attempt_download_asset
+
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=target.parent, prefix=f".{p.name}.") as tmp:
+            got = Path(attempt_download_asset(Path(tmp) / p.name))
+            if not got.is_file():
+                raise FileNotFoundError(f"YOLO weights {p.name!r} could not be downloaded")
+            os.replace(got, target)
+    return str(target)
 
 
 class YOLOModel(BaseModel):
@@ -93,7 +139,7 @@ class YOLOModel(BaseModel):
     def load(self) -> None:
         from ultralytics import YOLO
 
-        self.model = YOLO(self.model_name)
+        self.model = YOLO(resolve_weights(self.model_name))
         self.model.to(self.device)
 
     def _results_to_dict(self, result, img_area: int) -> dict[str, float]:
