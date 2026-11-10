@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.1] - 2026-11-10
+
+### Changed
+- `gist` convolves its 32 Gabor kernels in the Fourier domain, all at once,
+  instead of one direct `scipy.ndimage.convolve` per kernel. The largest
+  kernel (frequency 0.05) is 69 x 69, so the direct path cost ~2.8 G
+  multiply-adds per 256 px image, ~4 s on one core: on video, `gist` was
+  slower than every GPU model combined. Now ~75 ms per frame end to end
+  (~55x). The boundary rule is unchanged (`reflect`, reproduced by symmetric
+  padding), and the descriptor equals the old one to floating-point rounding
+  (relative difference ~1e-16; `tests/test_gist.py` checks it against the
+  direct path). Columns, labels and preprocessing are unchanged.
+
 ## [0.19.0] - 2026-11-09
 
 ### Added
