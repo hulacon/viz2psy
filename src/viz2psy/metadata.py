@@ -316,6 +316,33 @@ class MetadataBuilder:
             self.input_info["saved_frames_format"] = frame_format
         self.index_column = "time"
 
+    def set_input_video_set(
+        self,
+        videos: list[dict],
+        frame_interval: float,
+        rule: dict,
+    ):
+        """Set input info for several videos scored in one call (``type: "video_set"``).
+
+        ``rule`` is the stage-0 rule every video shares (``frame_source`` and
+        :data:`viz2psy.framing.RULE_RECORD_KEYS`), recorded once as
+        ``input.framing`` so a consumer reads the rule where it reads a single
+        video's. Each entry of ``videos`` carries what differs per file: its
+        path, ``stimulus_id``, ``n_frames``, ``frame_cache`` and the per-file
+        stage-0 values (box, sizes). Rows are keyed (``stimulus_id``, ``time``).
+        """
+        caches = {v["frame_cache"] for v in videos}
+        self.input_info = {
+            "type": "video_set",
+            "count": len(videos),
+            "frame_interval_sec": frame_interval,
+            "n_frames": sum(int(v["n_frames"]) for v in videos),
+            "framing": {**rule,
+                        "frame_cache": caches.pop() if len(caches) == 1 else "per video"},
+            "videos": videos,
+        }
+        self.index_column = "time"
+
     def set_output(self, path: Path, rows: int, columns: int):
         """Set output info."""
         self.output_info = {

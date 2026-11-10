@@ -307,6 +307,12 @@ def lookup(rows: dict[str, dict], video_path: str | Path) -> dict:
 STAGE0_VERSION = "1"
 SAR_TOL = 1e-5
 
+#: The keys of :meth:`Stage0.record` that every video scored under one rule
+#: shares (a video set records them once, as ``input.framing``); the rest
+#: (box, sizes, ``box_source``) are per file.
+RULE_RECORD_KEYS = ("stage0", "stage0_version", "framing_table",
+                    "framing_table_sha256", "detect_rule_version")
+
 
 @dataclass(frozen=True)
 class Stage0:

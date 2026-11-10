@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-11-10
+
+### Added
+- Several videos in one call: `viz2psy <model> a.mp4 b.mp4 ... -o out.csv`.
+  Each model is loaded once and run over every video in turn, so a corpus of
+  short clips no longer pays a model load per clip. Every video goes through
+  the same stage 0 as a single-video call (frames decoded, cropped to the
+  framing table's box, pixels squared), and the features are identical to one
+  call per video, `motion` included. Rows are keyed (`stimulus_id`, `time`);
+  `--id-pattern` takes `{stem}` to name each video's rows (default: the
+  stem). The sidecar's `input.type` is `"video_set"`: the shared framing rule
+  is recorded once as `input.framing` (so `framing_table_sha256` sits where it
+  does for one video), and each file's path, `stimulus_id`, `n_frames`,
+  `frame_cache` and per-file stage-0 values (box, sizes, `box_source`) are in
+  `input.videos`. Additive, so the schema version stays 1.3. A set that mixes
+  videos and images, two videos with one `stimulus_id`, `--stimulus-id`,
+  `--save-frames` and `--parallel` are refused; no dashboard is built. Every
+  video is looked up in the framing table before any model loads.
+- `viz2psy.framing.RULE_RECORD_KEYS`: the stage-0 record keys every video
+  under one rule shares.
+
 ## [0.19.1] - 2026-11-10
 
 ### Changed
