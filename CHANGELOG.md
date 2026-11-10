@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-11-10
+
+### Changed
+- `faces` detects on a canonical input size: every picture is resized
+  (bilinear, aspect kept) to a short side of 540 px, and the YuNet score
+  threshold is 0.8 (was: native pixels, 0.9). At native pixels the smallest
+  detectable face is a fixed pixel count, so `faces_count` and the
+  frame-relative area columns carried a floor that moved with each corpus's
+  resolution; it is now a fixed fraction of the frame. The size and threshold
+  come from a calibration against human face boxes on live-action video. At
+  the old setting YuNet's scores cluster just under 0.9, so many visible
+  faces were recorded as `faces_count` 0. **Values change**: `faces` outputs
+  from earlier versions are not comparable and should be re-extracted. The
+  sidecar's `preprocessing` now records the resize and threshold. Weights and
+  `checkpoint` are unchanged.
+
 ## [0.20.1] - 2026-11-10
 
 ### Fixed
