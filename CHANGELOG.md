@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-11-09
+
+### Added
+- Optional sidecar key `device_name`: the GPU model behind a `cuda` device
+  (e.g. `NVIDIA H100 80GB HBM3`), next to `device`. Written when it can be
+  read, left out otherwise (CPU, MPS, an unreadable name), and never a reason
+  for a run to fail. Additive and optional, so the schema version stays 1.3.
+  `caption_vlm`'s greedy bf16 captions reword some frames between GPU types,
+  so its outputs should be compared or pooled within one `device_name`.
+
 ## [0.18.0] - 2026-11-09
 
 ### Added

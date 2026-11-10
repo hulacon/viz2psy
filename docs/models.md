@@ -130,7 +130,7 @@ One English sentence per image or video frame, written by Qwen3-VL-8B-Instruct f
 - **Model**: `Qwen/Qwen3-VL-8B-Instruct` at a pinned Hub revision; `checkpoint` in the sidecar is `<repo>@<revision>`, `model_version` the transformers version (>= 4.57 required)
 - **Prompt**: frozen and versioned (`PROMPT_VERSION`, currently `caption-prompt v1`); the sidecar's `preprocessing` record carries the prompt text, its version and the decoding settings. A different prompt is a different feature: change the version with it
 - **Input**: shrunk (never enlarged) to at most 768 px on the long side with aspect kept, then the Qwen3-VL processor's default dynamic resolution. Video frames arrive after stage 0 of the framing rule (bars cropped, pixels squared)
-- **Decoding**: greedy, at most 64 new tokens, bfloat16, batched with left padding. In bfloat16 a caption can differ in rare tokens with its batch, so compare runs at the same `--batch-size`
+- **Decoding**: greedy, at most 64 new tokens, bfloat16, batched with left padding. In bfloat16 a caption can differ with its batch and with the GPU type (about 12 % of frames reword between two H100s, about 34 % between an A100 and an H100), so compare runs at the same `--batch-size` and within one sidecar `device_name`
 - **Cost**: about 21 GB of GPU memory; ~30 frames/s on an H100 at batch 32
 - **Reference**: as the model card cites: Qwen Team (2025), Qwen3 technical report, arXiv:2505.09388; Bai, S., et al. (2025), Qwen2.5-VL technical report, arXiv:2502.13923.
 

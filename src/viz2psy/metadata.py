@@ -29,6 +29,27 @@ def get_version() -> str:
         return "unknown"
 
 
+def device_name(device: str | None) -> str | None:
+    """The GPU model behind a ``cuda[:N]`` device (e.g. "NVIDIA H100 80GB HBM3"), else None.
+
+    Optional provenance (Contract B §4.1): a model whose output depends on the
+    GPU's arithmetic (greedy bf16 decoding in ``caption_vlm`` rewords some
+    captions between GPU types) can be grouped by it. Never required, and a
+    failure to read it never fails a run: the key is then left out.
+    """
+    if not device or not str(device).startswith("cuda"):
+        return None
+    try:
+        import torch
+
+        if not torch.cuda.is_available():
+            return None
+        index = torch.device(device).index
+        return torch.cuda.get_device_name(torch.cuda.current_device() if index is None else index)
+    except Exception:
+        return None
+
+
 def get_model_version(model_name: str) -> str:
     """Get version of underlying model package."""
     version_map = {
@@ -238,6 +259,7 @@ class MetadataBuilder:
         self.output_info = {}
         self.index_column = None
         self.device = None
+        self.device_name = None
         self.models = {}
         self.model_features = {}
         self.total_runtime_sec = 0.0
@@ -303,8 +325,9 @@ class MetadataBuilder:
         }
 
     def set_device(self, device: str):
-        """Set device used for inference."""
+        """Set device used for inference, and the GPU's model name when it can be read."""
         self.device = str(device)
+        self.device_name = device_name(self.device)
 
     def add_model(self, model_name: str, feature_names: list[str], runtime_sec: float,
                   preprocessing: dict | None = None):
@@ -352,6 +375,7 @@ class MetadataBuilder:
             "output": self.output_info,
             "index_column": self.index_column,
             "device": self.device,
+            **({"device_name": self.device_name} if self.device_name else {}),
             "total_runtime_sec": round(self.total_runtime_sec, 3),
             "models": self.models,
         }
