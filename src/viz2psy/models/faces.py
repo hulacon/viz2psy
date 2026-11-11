@@ -33,6 +33,13 @@ Per image:
 
 A frame with no faces scores count 0 and areas 0.0 — an explicit result,
 not missing data; only the configuration features are NaN there.
+
+Domain. YuNet is trained on photographs of human faces. On live action a
+zero is a reasonable "no face"; on animated material (drawn, CG,
+stylised characters, animal characters) it misses most faces, so a zero
+there does not mean the frame has none. What it does detect is reliable in
+both domains. Read the faces columns as human-face measures on live action,
+and do not use ``faces_count == 0`` to gate "no face" on animation.
 """
 
 import hashlib
@@ -81,7 +88,9 @@ class FacesModel(BaseModel):
         },
         "columns": {
             "faces_count": {"Description": "Number of faces detected by YuNet at score >= 0.8, "
-                                                "on the picture resized to a short side of 540 px"},
+                                                "on the picture resized to a short side of 540 px. "
+                                                "Misses most faces in animated material, where 0 "
+                                                "does not mean no face"},
             "faces_total_area": {"Description": "Summed face-box area as a fraction of the image "
                                                 "(overlaps counted twice)"},
             "faces_max_area": {"Description": "Largest face-box area as a fraction of the image"},

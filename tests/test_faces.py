@@ -127,6 +127,10 @@ class TestFacesModel:
         assert str(SHORT_SIDE) in pre["resize"]
         assert pre["score_threshold"] == 0.8
 
+    def test_count_description_states_the_animation_limit(self):
+        desc = FacesModel.labels["columns"]["faces_count"]["Description"]
+        assert "animated" in desc and "does not mean no face" in desc
+
     def test_hash_mismatch_names_the_fix(self, tmp_path):
         from viz2psy.exceptions import ModelLoadError
 
