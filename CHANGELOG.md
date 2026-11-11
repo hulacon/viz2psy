@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.1] - 2026-11-10
+
+### Changed
+- `faces`: the `faces_count` Description and the module docstring now state
+  the detector's domain. YuNet is trained on photographs of human faces and
+  misses most faces in animated material (drawn, CG, stylised or animal
+  characters), so a zero there does not mean "no face"; detections it does
+  make are reliable in both domains. Wording only: values, weights and
+  preprocessing are unchanged, and nothing needs re-extracting.
+
 ## [0.21.0] - 2026-11-10
 
 ### Changed
