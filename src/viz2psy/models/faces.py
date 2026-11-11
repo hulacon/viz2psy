@@ -7,9 +7,19 @@ are arranged. Detection is OpenCV's bundled FaceDetectorYN (YuNet) — a
 and verified by SHA-256, so no new Python dependency (deliberately not
 mediapipe: its dependency tree is disproportionate to five scalars).
 
+Detection scale. Every picture is resized (bilinear, aspect kept) to a
+short side of ``SHORT_SIDE`` px before detection, and the score threshold is
+``SCORE_THRESHOLD``. At native pixels YuNet's smallest detectable face is a
+fixed pixel count, so the frame-relative columns below would carry a
+resolution-dependent floor and differ between corpora by pixel size alone.
+A canonical size makes that floor a fixed fraction of the frame. The size and
+threshold were chosen by a calibration against human face boxes on
+live-action video (miss rate on frames with a face, precision, recall by face
+size); before 0.21.0 detection ran at native pixels with score >= 0.9.
+
 Per image:
 
-- ``faces_count`` — detections at score >= 0.9 (the YuNet default)
+- ``faces_count`` — detections at score >= ``SCORE_THRESHOLD``
 - ``faces_total_area`` — summed face-box area as a fraction of the image
   (overlaps counted twice; a crowd of close-ups can exceed 1)
 - ``faces_max_area`` — largest face as a fraction of the image (close-up
@@ -43,7 +53,8 @@ _WEIGHTS_URL = (
 )
 _WEIGHTS_SHA256 = "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4"
 
-SCORE_THRESHOLD = 0.9  # the YuNet default
+SCORE_THRESHOLD = 0.8  # calibrated (module docstring); YuNet's own default is 0.9
+SHORT_SIDE = 540  # detection input: short side in px, bilinear, aspect kept
 
 FEATURE_NAMES = [
     "faces_count",
@@ -59,8 +70,8 @@ class FacesModel(BaseModel):
 
     name = "faces"
     nulls = {
-        "faces_center_dist": {"means": "undefined", "when": "no face detected (score >= 0.9)"},
-        "faces_mutual_dist": {"means": "undefined", "when": "fewer than two faces detected (score >= 0.9)"},
+        "faces_center_dist": {"means": "undefined", "when": "no face detected (score >= 0.8, short side 540)"},
+        "faces_mutual_dist": {"means": "undefined", "when": "fewer than two faces detected (score >= 0.8, short side 540)"},
     }
     checkpoint = "opencv_zoo/face_detection_yunet_2023mar"
     labels = {
@@ -69,7 +80,8 @@ class FacesModel(BaseModel):
             "derivation": "trained-on-labels",
         },
         "columns": {
-            "faces_count": {"Description": "Number of faces detected by YuNet at score >= 0.9"},
+            "faces_count": {"Description": "Number of faces detected by YuNet at score >= 0.8, "
+                                                "on the picture resized to a short side of 540 px"},
             "faces_total_area": {"Description": "Summed face-box area as a fraction of the image "
                                                 "(overlaps counted twice)"},
             "faces_max_area": {"Description": "Largest face-box area as a fraction of the image"},
@@ -87,7 +99,8 @@ class FacesModel(BaseModel):
     @staticmethod
     def describe_preprocessing() -> dict:
         """The input transform, as recorded in the sidecar."""
-        return {'resize': "none: YuNet runs at the picture's own pixel size"}
+        return {"resize": f"short side {SHORT_SIDE} px, bilinear (cv2.INTER_LINEAR), aspect kept",
+                "score_threshold": SCORE_THRESHOLD}
 
     def load(self) -> None:
         import cv2
@@ -120,11 +133,22 @@ class FacesModel(BaseModel):
     def predict(self, image: Image.Image) -> dict[str, float]:
         rgb = np.asarray(image.convert("RGB"))
         bgr = rgb[..., ::-1].copy()
+        bgr = resize_short_side(bgr, SHORT_SIDE, self._cv2)
         h, w = bgr.shape[:2]
         self.model.setInputSize((w, h))
         _, faces = self.model.detect(bgr)
         boxes = np.asarray(faces)[:, :4] if faces is not None else np.empty((0, 4))
         return face_stats(boxes, w, h)
+
+
+def resize_short_side(img: np.ndarray, short: int, cv2) -> np.ndarray:
+    """Resize so the shorter side is ``short`` px (bilinear, aspect kept); up or down."""
+    h, w = img.shape[:2]
+    k = short / min(h, w)
+    size = (int(round(w * k)), int(round(h * k)))
+    if size == (w, h):
+        return img
+    return cv2.resize(img, size, interpolation=cv2.INTER_LINEAR)
 
 
 def face_stats(boxes: np.ndarray, w: int, h: int) -> dict[str, float]:
