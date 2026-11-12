@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-11-12
+
 ### Added
 - `context_affect`: visually inferred valence and arousal of an on-screen
   character (2 columns), a ridge probe on frozen CLIP ViT-L-14 (OpenAI)
