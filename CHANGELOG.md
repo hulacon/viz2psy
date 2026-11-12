@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `context_affect`: visually inferred valence and arousal of an on-screen
+  character (2 columns), a ridge probe on frozen CLIP ViT-L-14 (OpenAI)
+  embeddings trained on VEATIC's per-frame consensus ratings. Labels: nameable,
+  probe, derived from `ViT-L-14/openai`. The weights are not shipped: VEATIC
+  is released for research use, so `scripts/train_context_affect.py` builds
+  them from the public data (`embed`, then `fit` with nested CV grouped by
+  video; the rating delay per dimension is chosen with alpha by CCC, as in
+  the AVEC 2016 baseline). The model reads them from
+  `$VIZ2PSY_CONTEXT_AFFECT_WEIGHTS` or `<torch hub dir>/viz2psy/`, fails
+  loudly when they are absent, and records their sha256, delay and alpha in
+  the sidecar's preprocessing record.
+
 ## [0.21.1] - 2026-11-10
 
 ### Changed

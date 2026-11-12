@@ -245,7 +245,7 @@ def test_every_model_records_its_preprocessing(name):
     assert isinstance(describe(), dict) and describe()
 
 
-@pytest.mark.parametrize("name", ["clip", "aesthetics", "ebind", "dinov2", "places"])
+@pytest.mark.parametrize("name", ["clip", "aesthetics", "context_affect", "ebind", "dinov2", "places"])
 def test_crop_networks_squash(name):
     rec = _model_class(name).describe_preprocessing()
     assert rec["square"].startswith("squash")
