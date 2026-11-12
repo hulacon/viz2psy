@@ -65,7 +65,6 @@ MODEL_REGISTRY = {
     "saliency": ("viz2psy.models.saliency", "SaliencyModel", "576-dim fixation density grid"),
     "dinov2": ("viz2psy.models.dinov2", "DINOv2Model", "768-dim DINOv2 ViT-B/14 embeddings"),
     "aesthetics": ("viz2psy.models.aesthetics", "AestheticsModel", "Aesthetic quality score (1-10)"),
-    "context_affect": ("viz2psy.models.context_affect", "ContextAffectModel", "Context-inferred valence + arousal (VEATIC probe on CLIP ViT-L-14; weights built locally)"),
     "places": ("viz2psy.models.places", "PlacesModel", "365 scene + 102 attribute probabilities"),
     "yolo": ("viz2psy.models.yolo", "YOLOModel", "80 object counts + 5 summary statistics"),
     "motion": ("viz2psy.models.motion", "MotionModel", "7 optical-flow motion statistics (video only)"),

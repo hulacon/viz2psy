@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-11-12
+
+### Removed
+- `context_affect` and `scripts/train_context_affect.py` (added in 0.22.0)
+  are withdrawn. The probe was not validated for use on clips outside its
+  training set, so it should not be offered as a feature. 0.22.0 was never
+  tagged or released, and its weights were never distributed. Nothing else
+  changes: every other model's output is identical to 0.22.0 and 0.21.1.
+
 ## [0.22.0] - 2026-11-12
 
 ### Added

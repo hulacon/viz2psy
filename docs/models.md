@@ -55,30 +55,6 @@ from viz2psy.models.emonet import EmoNetModel
 model = EmoNetModel()
 ```
 
-### context_affect
-
-Visually inferred valence and arousal of an on-screen character, as observers judge it from context plus character.
-
-- **Output**: `context_affect_valence`, `context_affect_arousal` (VEATIC's [-1, 1] scale; linear output, not clipped)
-- **Model**: ridge probe on the frozen, L2-normalised CLIP ViT-L-14 (OpenAI) image embedding (the backbone `aesthetics` uses), trained on VEATIC's per-frame consensus ratings
-- **Construct**: VEATIC raters tracked one cued character in silent clips (inferential emotion tracking). On uncued footage the probe reads the salient character or the scene context. It is **not** the viewer's felt emotion, and frames with no person, and still photographs, are outside its training domain
-- **Rating delay**: continuous ratings trail the picture by the raters' reaction time. Per dimension, the ratings are shifted back by a delay chosen with the ridge alpha by CCC in grouped cross-validation (the AVEC 2016 baseline's procedure). The delay and alpha are recorded in the sidecar's `preprocessing.probe`
-- **Weights are not shipped.** VEATIC's ratings are released for research use. Build the weights once from the public data:
-
-  ```bash
-  python scripts/train_context_affect.py embed --videos VEATIC/videos --out emb/
-  python scripts/train_context_affect.py fit --features emb/ --videos VEATIC/videos \
-      --ratings VEATIC/rating_averaged --out report/ --write-weights context_affect_v1.npz
-  ```
-
-  Then set `VIZ2PSY_CONTEXT_AFFECT_WEIGHTS` to the file, or put it at `<torch hub dir>/viz2psy/context_affect_v1.npz`. Without it, `load()` fails and names both places. Byte-identical VEATIC videos (one clip rated for two characters) are treated as one video with averaged targets, and kept in one CV fold. `--exclude` drops clips, e.g. ones that overlap footage you evaluate on
-- **Reference**: Ren, Z., et al. (2024). VEATIC: Video-based Emotion and Affect Tracking in Context Dataset. *WACV 2024*.
-
-```python
-from viz2psy.models.context_affect import ContextAffectModel
-model = ContextAffectModel()
-```
-
 ---
 
 ## Semantics

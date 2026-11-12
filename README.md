@@ -99,7 +99,6 @@ df = score_images(model, ["photo1.jpg", "photo2.jpg"])
 | `llstat` | 17 scores | Low-level statistics |
 | `saliency` | 576 dims | Fixation density grid |
 | `aesthetics` | 1 score | Aesthetic quality |
-| `context_affect` | 2 scores | Context-inferred valence and arousal of an on-screen character (ridge probe on CLIP ViT-L-14, trained on VEATIC). **Weights are not shipped**: build them once with `scripts/train_context_affect.py` (see docs/models.md) |
 | `yolo` | 85 scores | Object detection counts |
 | `motion` | 7 scores | Optical-flow motion statistics — **video only** (energy, coherence, pan/tilt, radial looming, frame difference; Farnebäck flow between native-adjacent frames at each grid timestamp, in frame-heights/s) |
 | `faces` | 5 scores | Face count/size/configuration (OpenCV YuNet): count, total/max area, framing, face clustering |
@@ -155,7 +154,6 @@ models you used:
 - **Colorfulness** (`llstat`): Hasler, D., & Suesstrunk, S. E. (2003). Measuring colorfulness in natural images. *SPIE Human Vision and Electronic Imaging VIII*. [doi:10.1117/12.477378](https://doi.org/10.1117/12.477378)
 - **DeepGaze IIE** (`saliency`): Linardos, A., Kümmerer, M., Press, O., & Bethge, M. (2021). DeepGaze IIE: Calibrated prediction in and out-of-domain for state-of-the-art saliency modeling. *ICCV 2021*. [arXiv:2105.12441](https://arxiv.org/abs/2105.12441)
 - **LAION Aesthetics** (`aesthetics`): Schuhmann, C., et al. (2022). LAION-5B: An open large-scale dataset for training next generation image-text models. *NeurIPS 2022 Datasets and Benchmarks*. [arXiv:2210.08402](https://arxiv.org/abs/2210.08402); predictor head from [improved-aesthetic-predictor](https://github.com/christophschuhmann/improved-aesthetic-predictor)
-- **VEATIC** (`context_affect`): Ren, Z., Ortega, J., Wang, Y., Chen, Z., Guo, Y., Yu, S. X., & Whitney, D. (2024). VEATIC: Video-based Emotion and Affect Tracking in Context Dataset. *WACV 2024*, 4467–4477. [arXiv:2309.06745](https://arxiv.org/abs/2309.06745); rating-delay compensation after Valstar, M., et al. (2016). AVEC 2016: Depression, mood, and emotion recognition workshop and challenge. *Proc. AVEC '16*, 3–10. [doi:10.1145/2988257.2988258](https://doi.org/10.1145/2988257.2988258)
 - **VGG19** (`vgg19`): Simonyan, K., & Zisserman, A. (2015). Very deep convolutional networks for large-scale image recognition. *ICLR 2015*. [arXiv:1409.1556](https://arxiv.org/abs/1409.1556)
 - **YOLOv8** (`yolo`): Jocher, G., Chaurasia, A., & Qiu, J. (2023). Ultralytics YOLOv8 (software). [github.com/ultralytics/ultralytics](https://github.com/ultralytics/ultralytics)
 

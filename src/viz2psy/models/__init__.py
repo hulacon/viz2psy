@@ -18,7 +18,6 @@ def __getattr__(name):
         "SaliencyModel": ".saliency",
         "DINOv2Model": ".dinov2",
         "AestheticsModel": ".aesthetics",
-        "ContextAffectModel": ".context_affect",
         "PlacesModel": ".places",
         "YOLOModel": ".yolo",
         "VGG19Model": ".vgg19",
