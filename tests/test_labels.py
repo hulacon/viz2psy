@@ -75,6 +75,7 @@ INVENTORY = {
     "saliency": lambda: [f"saliency_{x:02d}_{y:02d}" for y in range(24) for x in range(24)],
     "dinov2": lambda: _numbered("dinov2", 768),
     "aesthetics": lambda: ["aesthetics_score"],
+    "context_affect": _module_attr("context_affect", "FEATURE_NAMES"),
     "places": _places_columns,
     "yolo": _yolo_columns,
     "motion": _module_attr("motion", "FEATURE_NAMES"),
@@ -264,3 +265,18 @@ def test_refresh_adds_labels_and_never_touches_the_csv(tmp_path):
     assert "models.*.labels" in new["refreshed"][-1]["fields"]
     assert csv.read_bytes() == before
     assert refresh_sidecar(side).status == "unchanged"
+
+
+def test_context_affect_is_a_probe_on_the_aesthetics_backbone_not_on_clip():
+    labels = _model_class("context_affect").labels  # open_clip is imported only at load()
+    from viz2psy.models import context_affect
+
+    for col in context_affect.FEATURE_NAMES:
+        r = resolve(labels, col)
+        assert (r["interpretability"], r["derivation"]) == ("nameable", "probe"), col
+        assert r["derived_from"] == context_affect.BACKBONE
+    # Not circular with `clip`; the same backbone `aesthetics` loads.
+    assert context_affect.BACKBONE != _model_class("clip").checkpoint  # skips without open_clip
+    from viz2psy.models import aesthetics
+
+    assert context_affect.BACKBONE == f"{aesthetics._CLIP_MODEL}/{aesthetics._CLIP_PRETRAINED}"

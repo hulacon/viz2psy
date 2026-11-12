@@ -64,6 +64,7 @@ def get_model_version(model_name: str) -> str:
         "saliency": ("deepgaze_pytorch", None),
         "dinov2": ("torch", "facebookresearch/dinov2"),
         "aesthetics": ("open_clip_torch", "LAION"),
+        "context_affect": ("open_clip_torch", None),  # preprocessing record names the weights sha256
         "places": ("torch", None),  # inline arch; checkpoint field names the weights
         "yolo": ("ultralytics", None),
         "motion": ("opencv-python", None),  # analytic Farnebäck flow
