@@ -65,6 +65,8 @@ def get_model_version(model_name: str) -> str:
         "dinov2": ("torch", "facebookresearch/dinov2"),
         "aesthetics": ("open_clip_torch", "LAION"),
         "context_affect": ("open_clip_torch", None),  # preprocessing record names the weights sha256
+        "experiential": ("open_clip_torch", None),  # likewise
+        "vitl14": ("open_clip_torch", None),
         "places": ("torch", None),  # inline arch; checkpoint field names the weights
         "yolo": ("ultralytics", None),
         "motion": ("opencv-python", None),  # analytic Farnebäck flow
@@ -156,6 +158,13 @@ def get_feature_info(model_name: str, feature_names: list[str]) -> dict[str, Any
     if model_name == "dinov2" and feature_names and feature_names[0].startswith("dinov"):
         return {
             "pattern": "dinov2_{NNN}",
+            "range": [0, count - 1],
+            "count": count
+        }
+
+    if model_name == "vitl14" and feature_names and feature_names[0].startswith("vitl14_"):
+        return {
+            "pattern": "vitl14_{NNN}",
             "range": [0, count - 1],
             "count": count
         }

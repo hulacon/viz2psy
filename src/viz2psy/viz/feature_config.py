@@ -179,6 +179,18 @@ FEATURE_CONFIGS: dict[str, FeatureConfig] = {
         column_patterns=["dinov2_*"],
         scalar_features=[],
     ),
+    "vitl14": FeatureConfig(
+        name="vitl14",
+        description="768-dim CLIP ViT-L-14 (OpenAI) embeddings",
+        feature_type="embedding",
+        n_dims=768,
+        timeseries=False,
+        mds_clustering=True,
+        trajectories=True,
+        timeseries_mode="none",
+        column_patterns=["vitl14_*"],
+        scalar_features=[],
+    ),
     "saliency": FeatureConfig(
         name="saliency",
         description="576-dim fixation density grid (24x24)",

@@ -19,6 +19,8 @@ def __getattr__(name):
         "DINOv2Model": ".dinov2",
         "AestheticsModel": ".aesthetics",
         "ContextAffectModel": ".context_affect",
+        "ExperientialModel": ".experiential",
+        "ViTL14Model": ".vitl14",
         "PlacesModel": ".places",
         "YOLOModel": ".yolo",
         "VGG19Model": ".vgg19",
