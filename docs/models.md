@@ -81,6 +81,44 @@ model = ContextAffectModel()
 
 ---
 
+### vitl14
+
+The CLIP ViT-L-14 (OpenAI) image embedding that `context_affect` and `experiential` read: 768 dimensions, L2-normalised, on the squashed image (`vitl14_000` … `vitl14_767`; opaque). A head's columns are `table @ W + b` with its weights file's `W` and `b`, so a stored `vitl14` table lets any head on this backbone be applied, or a new one fitted, on CPU without running the backbone again.
+
+```python
+from viz2psy.models.vitl14 import ViTL14Model
+model = ViTL14Model()
+```
+
+---
+
+### experiential
+
+Binder et al. (2016)'s experiential attributes of the object concept an image depicts: how strongly English speakers associate it with each of 65 attributes in 14 domains (vision, sound, upper-limb action, fear, …; 0–6).
+
+- **Output**: `experiential_<attribute>` (e.g. `experiential_vision`, `experiential_upperlimb`), exactly the attributes the weights hold (all 65, or the subset they were trained on); Binder's 0–6 scale, linear output, not clipped
+- **Model**: ridge probe per attribute on the frozen, L2-normalised CLIP ViT-L-14 (OpenAI) image embedding, through the same squash-and-embed path as `aesthetics` and `context_affect`
+- **Training rows**: every THINGS photograph of a concept whose name is a rated Binder word, each labelled with its concept's ratings; alpha per attribute by 5-fold CV grouped by concept. An attribute trains on the concepts that rated it (Binder did not rate verbs and adjectives on Complexity)
+- **Construct**: the attribute profile of the depicted *object*. On a scene or film frame it reads a mixture of what is depicted. It is not a rating of the image, nor of the viewer's experience. Scenes, people-centred frames and text on screen are outside the training domain
+- **Weights are not shipped.** The ratings are distributed with a citation request and no licence, so you supply them; THINGS images are licensed for research use. Build the weights once (needs word2psy >= 0.14.0, whose loader reads the ratings):
+
+  ```bash
+  python scripts/train_experiential.py embed --ratings WordSet1_Ratings.xlsx \
+      --things-zip images_THINGS.zip --password-file password_images.txt --out things_vitl14.npz
+  python scripts/train_experiential.py fit --ratings WordSet1_Ratings.xlsx \
+      --embeddings things_vitl14.npz [--attributes keep.txt] --write-weights experiential_v1.npz
+  ```
+
+  Then set `VIZ2PSY_EXPERIENTIAL_WEIGHTS` to the file, or put it at `<torch hub dir>/viz2psy/experiential_v1.npz`. Without it, `load()` fails and names both places. The images are read inside the zip, never extracted. The sidecar's `preprocessing.probe` records the weights' sha256, columns, alpha and the ratings file's sha256
+- **References**: Binder, J. R., et al. (2016). Toward a brain-based componential semantic representation. *Cognitive Neuropsychology*. Hebart, M. N., et al. (2019). THINGS. *PLOS ONE*
+
+```python
+from viz2psy.models.experiential import ExperientialModel
+model = ExperientialModel()
+```
+
+---
+
 ## Semantics
 
 ### clip

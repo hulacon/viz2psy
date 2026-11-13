@@ -74,8 +74,10 @@ INVENTORY = {
     "llstat": _llstat_columns,
     "saliency": lambda: [f"saliency_{x:02d}_{y:02d}" for y in range(24) for x in range(24)],
     "dinov2": lambda: _numbered("dinov2", 768),
+    "vitl14": lambda: _numbered("vitl14", 768),
     "aesthetics": lambda: ["aesthetics_score"],
     "context_affect": _module_attr("context_affect", "FEATURE_NAMES"),
+    "experiential": _module_attr("experiential", "FEATURE_NAMES"),  # weights emit a subset
     "places": _places_columns,
     "yolo": _yolo_columns,
     "motion": _module_attr("motion", "FEATURE_NAMES"),
@@ -116,7 +118,7 @@ def test_every_column_resolves_to_valid_labels(model):
     assert problems(labels, columns) == []
 
 
-@pytest.mark.parametrize("model", ["clip", "dinov2", "ebind", "gist", "saliency"])
+@pytest.mark.parametrize("model", ["clip", "dinov2", "vitl14", "ebind", "gist", "saliency"])
 def test_pattern_inventories_match_the_sidecar_pattern(model):
     # The inventories above are generated; check them against the pattern the
     # sidecar records, so `columns` keys are tested against real column names.
@@ -129,7 +131,7 @@ def test_pattern_inventories_match_the_sidecar_pattern(model):
         assert info["columns"] == columns
 
 
-@pytest.mark.parametrize("model", ["clip", "dinov2", "ebind"])
+@pytest.mark.parametrize("model", ["clip", "dinov2", "vitl14", "ebind"])
 def test_embeddings_are_opaque_embeddings(model):
     labels = _model_class(model).labels
     for col in INVENTORY[model]():

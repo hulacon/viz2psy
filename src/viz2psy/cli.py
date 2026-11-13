@@ -66,6 +66,8 @@ MODEL_REGISTRY = {
     "dinov2": ("viz2psy.models.dinov2", "DINOv2Model", "768-dim DINOv2 ViT-B/14 embeddings"),
     "aesthetics": ("viz2psy.models.aesthetics", "AestheticsModel", "Aesthetic quality score (1-10)"),
     "context_affect": ("viz2psy.models.context_affect", "ContextAffectModel", "Context-inferred valence + arousal (VEATIC probe on CLIP ViT-L-14; weights built locally)"),
+    "experiential": ("viz2psy.models.experiential", "ExperientialModel", "Binder et al. (2016) experiential attributes of the depicted object (THINGS probe on CLIP ViT-L-14; weights built locally)"),
+    "vitl14": ("viz2psy.models.vitl14", "ViTL14Model", "768-dim CLIP ViT-L-14 (OpenAI) embeddings, the backbone context_affect and experiential read"),
     "places": ("viz2psy.models.places", "PlacesModel", "365 scene + 102 attribute probabilities"),
     "yolo": ("viz2psy.models.yolo", "YOLOModel", "80 object counts + 5 summary statistics"),
     "motion": ("viz2psy.models.motion", "MotionModel", "7 optical-flow motion statistics (video only)"),

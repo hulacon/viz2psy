@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-11-12
+
+### Added
+- `experiential`: Binder et al. (2016)'s experiential attributes (up to 65,
+  0–6) of the object an image depicts, a ridge probe per attribute on frozen
+  CLIP ViT-L-14 (OpenAI) embeddings (the `context_affect` backbone path),
+  trained on THINGS photographs of the rated concepts, each labelled with its
+  concept's ratings. Labels: nameable, probe, derived from `ViT-L-14/openai`.
+  The model emits exactly the attributes its weights hold. The weights are not
+  shipped (user-supplied ratings; THINGS is research use):
+  `scripts/train_experiential.py embed` reads the encrypted THINGS zip in
+  place, and `fit` reads the ratings through word2psy (>= 0.14.0) and uses its
+  probe fit (alpha per attribute by 5-fold CV grouped by concept). Weights
+  are read from `$VIZ2PSY_EXPERIENTIAL_WEIGHTS` or `<torch hub dir>/viz2psy/`;
+  the sidecar records their sha256, columns, alpha and the ratings' sha256.
+- `vitl14`: the 768-d L2-normalised CLIP ViT-L-14 (OpenAI) embedding, through
+  the squash-and-embed path `context_affect` and `experiential` read (opaque,
+  embedding; pattern `vitl14_{NNN}`). A stored `vitl14` table lets any head on
+  this backbone be applied or fitted on CPU (`table @ W + b`) instead of
+  re-running the backbone per head.
+
 ## [0.22.0] - 2026-11-12
 
 ### Added
