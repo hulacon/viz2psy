@@ -109,21 +109,38 @@ class TestInterlacedDecode:
         with pytest.raises(VideoError, match="uniform colour"):
             extract_frames(videos["blank"], frame_interval=0.4, quiet=True)
 
-    def test_forced_opencv_decode_is_refused(self, videos, monkeypatch):
+    def test_forced_opencv_decode_is_refused_or_correct(self, videos, monkeypatch):
         """The guards, on the real failure: the interlaced clip forced through OpenCV.
 
-        Which guard fires is not ours to pin. When swscale refuses the
-        conversion, OpenCV hands back whatever its output buffer already
-        held -- a stale earlier picture (frozen) or a fresh uniform buffer
-        (blank) -- and that varies across builds and runs on identical
-        dependencies. Either refusal is correct; scoring the clip is not.
+        Whether OpenCV fails here depends on its build. Builds whose swscale
+        refuses the interlaced conversion (opencv-python 5.0 and earlier) hand
+        back whatever the output buffer already held -- a stale earlier
+        picture (frozen) or a fresh uniform buffer (blank), varying across
+        builds and runs -- and either refusal is correct. Builds that decode
+        field-coded MPEG-2 correctly (opencv-python 5.1) must instead pass the
+        true picture through. What must never happen is a wrong picture scored
+        without an error.
         """
+        import cv2
+
         import viz2psy.video as video
         from viz2psy.exceptions import VideoError
 
+        cap = cv2.VideoCapture(str(videos["interlaced"]))
+        cap.set(cv2.CAP_PROP_POS_FRAMES, 20)
+        ok, bgr = cap.read()
+        cap.release()
+        decodes = ok and abs(square_x(cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)) - 30) <= 2
+
         monkeypatch.setattr(video, "is_interlaced", lambda *a, **k: False)
-        with pytest.raises(VideoError, match="bit-identical|uniform colour"):
-            video.extract_frames(videos["interlaced"], frame_interval=0.1, quiet=True)
+        if not decodes:
+            with pytest.raises(VideoError, match="bit-identical|uniform colour"):
+                video.extract_frames(videos["interlaced"], frame_interval=0.1, quiet=True)
+            return
+        frames = video.extract_frames(videos["interlaced"], frame_interval=0.1, quiet=True)
+        assert len(frames) >= 10
+        for t, img in frames:
+            assert abs(square_x(np.asarray(img)) - (10 + int(t * FPS))) <= 2
 
     def test_frozen_decode_is_refused(self, videos, monkeypatch):
         """The frozen guard, deterministically: a decoder stuck on its first picture."""
